@@ -631,6 +631,9 @@ export default function Workspace() {
                         <div>
                           <strong>{map.title}</strong>
                           <span>Atualizado em {formatDate(map.updated_at)}</span>
+                          {previews[map.id] && map.export_path && map.export_revision === map.revision && (
+                            <small className="map-preview-hint">Prévia reduzida · PNG 4K no botão de baixar</small>
+                          )}
                         </div>
                         <div className="map-card-actions">
                           <button className="workspace-secondary-button" type="button" onClick={() => void openMap(map)} disabled={loadingMapId === map.id}>

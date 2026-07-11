@@ -339,6 +339,32 @@ textarea:focus-visible {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.map-style-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--nx-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.map-style-field select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--nx-border);
+  border-radius: 6px;
+  padding: 0 10px;
+  color: var(--nx-text);
+  background: rgba(5, 7, 10, 0.62);
+  font: 600 13px/1.2 Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  cursor: pointer;
+}
+
+.map-style-field select:focus-visible {
+  outline: 2px solid rgba(249, 115, 22, 0.72);
+  outline-offset: 2px;
+}
+
 .utm-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

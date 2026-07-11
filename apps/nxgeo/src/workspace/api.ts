@@ -138,8 +138,10 @@ async function removeWorkspaceFiles(paths: string[]) {
 async function makeThumbnail(image: Blob) {
   if (typeof createImageBitmap !== 'function') return image
   const bitmap = await createImageBitmap(image)
-  const width = 560
-  const height = 315
+  // O card não substitui o PNG 4K, mas uma prévia 2x evita apagar rótulos finos
+  // e mantém a leitura honesta para quem confere o mapa antes de baixá-lo.
+  const width = 1120
+  const height = 630
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
@@ -156,7 +158,7 @@ async function makeThumbnail(image: Blob) {
   bitmap.close()
 
   return new Promise<Blob>((resolve) => {
-    canvas.toBlob((blob) => resolve(blob ?? image), 'image/webp', 0.72)
+    canvas.toBlob((blob) => resolve(blob ?? image), 'image/webp', 0.86)
   })
 }
 
