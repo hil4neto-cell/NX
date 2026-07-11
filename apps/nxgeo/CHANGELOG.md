@@ -2,6 +2,13 @@
 
 Registro manual de mudancas importantes. Data base: 2026-07-09.
 
+## 2026-07-11 - Aplicativo instalável
+
+- NXGEO passou a ter manifest, ícones próprios e abertura em modo aplicativo no desktop e celular.
+- Chrome oferece o botão Instalar aplicativo quando o navegador disponibiliza o prompt.
+- iPhone recebe uma orientação direta para Safari > Compartilhar > Adicionar à Tela de Início.
+- Adicionado cache somente da estrutura pública do app para abertura resiliente, sem guardar mapas, sessões ou arquivos privados do cliente.
+
 ## 2026-07-11 - Workspace de projetos e equipe
 
 - Adicionado painel receptivo com saudacao, busca, pastas e mapas recentes.

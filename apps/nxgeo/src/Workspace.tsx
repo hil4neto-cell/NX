@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import type { SavedProject } from './App'
+import PwaInstall from './PwaInstall'
 import { supabase } from './supabase'
 import {
   archiveMap,
@@ -437,6 +438,7 @@ export default function Workspace() {
 
       <section className="workspace-content">
         <header className="workspace-topbar">
+          <PwaInstall variant="workspace" />
           <label className="workspace-search">
             <Search size={18} aria-hidden="true" />
             <span className="sr-only">Buscar pasta ou mapa</span>
