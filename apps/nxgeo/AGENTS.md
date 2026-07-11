@@ -57,7 +57,7 @@ O usuario final nao deve ver uma marcacao laranja agressiva como primeira leitur
 
 ## Funcionalidades atuais
 
-- Acesso por link magico de e-mail com Supabase Auth.
+- Acesso por código único de seis dígitos enviado por e-mail com Supabase Auth, confirmado dentro do próprio NXGEO.
 - Autorizacao por `public.nxgeo_members`, aplicada por Auth Hook antes de criar o usuario e verificada novamente depois da sessao.
 - Marcelo (`marcelo.topografia@gmail.com`) e o administrador inicial.
 - Papeis de produto: `admin` gerencia equipe e todas as pastas; `user` trabalha somente nas pastas atribuidas.

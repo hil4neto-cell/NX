@@ -340,6 +340,89 @@
   opacity: 0.68;
 }
 
+.auth-code-sent {
+  margin: 0;
+  color: var(--auth-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.auth-code-sent strong {
+  color: var(--auth-text);
+  font-weight: 800;
+}
+
+.auth-code-form {
+  gap: 12px;
+}
+
+.auth-code-input {
+  width: 100%;
+  min-height: 60px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 10px;
+  outline: 0;
+  background: rgba(4, 8, 14, 0.64);
+  color: var(--auth-text);
+  font: inherit;
+  font-size: 24px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.34em;
+  padding: 0 0 0 0.34em;
+  text-align: center;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.auth-code-input::placeholder {
+  color: #677489;
+  opacity: 1;
+}
+
+.auth-code-input:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.auth-code-input:focus {
+  border-color: rgba(249, 115, 22, 0.72);
+  background: rgba(4, 8, 14, 0.82);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.09);
+}
+
+.auth-code-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.auth-form button.auth-text-action {
+  min-height: auto;
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #fdba74;
+  font-size: 12px;
+  font-weight: 750;
+  box-shadow: none;
+}
+
+.auth-form button.auth-text-action:hover:not(:disabled) {
+  background: transparent;
+  color: #fff7ed;
+  transform: none;
+  box-shadow: none;
+}
+
+.auth-form button.auth-text-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .auth-helper {
   display: flex;
   align-items: flex-start;
@@ -503,6 +586,11 @@
   .auth-form {
     margin-top: 23px;
   }
+
+  .auth-code-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-height: 720px) and (min-width: 881px) {
@@ -519,7 +607,8 @@
 @media (prefers-reduced-motion: reduce) {
   .auth-back,
   .auth-form button,
-  .auth-input {
+  .auth-input,
+  .auth-code-input {
     transition: none;
   }
 

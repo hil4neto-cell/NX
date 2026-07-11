@@ -15,7 +15,6 @@ type InvitedMember = {
 }
 
 const DEFAULT_ALLOWED_ORIGIN = 'https://nxprojetos.com'
-const DEFAULT_REDIRECT_URL = 'https://nxprojetos.com/nxgeo'
 const MAX_BODY_BYTES = 8_192
 
 function allowedOrigins() {
@@ -115,15 +114,8 @@ Deno.serve(async (request) => {
   const supabaseUrl = envValue('SUPABASE_URL')
   const publicKey = defaultKeyFromDictionary('SUPABASE_PUBLISHABLE_KEYS')
     ?? envValue('SUPABASE_ANON_KEY', 'SUPABASE_PUBLISHABLE_KEY')
-  const serverKey = defaultKeyFromDictionary('SUPABASE_SECRET_KEYS')
-    ?? envValue(
-      'SUPABASE_SERVICE_ROLE_KEY',
-      'SUPABASE_SECRET_KEY',
-      'NXGEO_SERVER_KEY',
-    )
-  const redirectTo = envValue('NXGEO_REDIRECT_URL') ?? DEFAULT_REDIRECT_URL
 
-  if (!supabaseUrl || !publicKey || !serverKey) {
+  if (!supabaseUrl || !publicKey) {
     return jsonResponse(origin, 503, { error: 'Servico de convite nao configurado.' })
   }
 
@@ -205,52 +197,19 @@ Deno.serve(async (request) => {
       persistSession: false,
     },
   })
-  const adminClient = createClient(supabaseUrl, serverKey, {
-    auth: {
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-      persistSession: false,
+  // A pessoa já foi incluída na allowlist pela RPC acima. Ao solicitar o
+  // código, o Auth Hook protege a criação da primeira conta e o mesmo e-mail
+  // serve para membros novos e existentes, sem abrir o navegador padrão.
+  const { error: deliveryError } = await publicMailClient.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: true,
     },
   })
 
-  let delivery: 'invite' | 'magic_link' = memberData.user_id
-    ? 'magic_link'
-    : 'invite'
-  let deliveryError: Error | null = null
-
-  if (delivery === 'magic_link') {
-    const { error } = await publicMailClient.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: redirectTo,
-        shouldCreateUser: false,
-      },
-    })
-    deliveryError = error
-  } else {
-    const { error } = await adminClient.auth.admin.inviteUserByEmail(email, {
-      data: fullName ? { full_name: fullName } : undefined,
-      redirectTo,
-    })
-
-    if (error && /already|registered|exists/i.test(error.message)) {
-      delivery = 'magic_link'
-      const { error: magicLinkError } = await publicMailClient.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: redirectTo,
-          shouldCreateUser: false,
-        },
-      })
-      deliveryError = magicLinkError
-    } else {
-      deliveryError = error
-    }
-  }
-
   if (deliveryError) {
     return jsonResponse(origin, 502, {
-      error: 'O acesso foi autorizado, mas o e-mail nao foi enviado.',
+      error: 'O acesso foi autorizado, mas o código não foi enviado.',
       member: {
         id: memberData.id,
         email: memberData.email,
@@ -270,6 +229,6 @@ Deno.serve(async (request) => {
       role: memberData.role,
       active: memberData.active,
     },
-    delivery,
+    delivery: 'code',
   })
 })
