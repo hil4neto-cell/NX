@@ -12,7 +12,10 @@ Registro manual de mudancas importantes. Data base: 2026-07-09.
 ## 2026-07-11 - Autenticacao com Supabase
 
 - Adicionada tela de acesso restrito por link magico enviado ao e-mail.
-- Cadastro automatico permanece desabilitado no cliente; somente usuarios previamente autorizados podem solicitar acesso.
+- Adicionada allowlist SQL para autorizar, bloquear e reativar e-mails sem usar o painel de usuarios.
+- Adicionado Auth Hook do Supabase para impedir no servidor o cadastro de e-mails fora da allowlist.
+- A permissao e verificada novamente depois da autenticacao.
+- Cadastro no Auth so ocorre depois da aprovacao da allowlist.
 - Sessao fica persistida e e renovada automaticamente no navegador.
 - Adicionado botao Sair ao painel do NXGEO.
 

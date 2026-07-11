@@ -8,9 +8,12 @@ type AuthGateProps = {
   children: ReactNode
 }
 
+type AccessState = 'idle' | 'checking' | 'allowed' | 'denied' | 'error'
+
 export default function AuthGate({ children }: AuthGateProps) {
   const [session, setSession] = useState<Session | null>(null)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
+  const [accessState, setAccessState] = useState<AccessState>('idle')
   const [email, setEmail] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [message, setMessage] = useState('')
@@ -22,6 +25,7 @@ export default function AuthGate({ children }: AuthGateProps) {
     void supabase.auth.getSession().then(({ data, error }) => {
       if (!active) return
       setSession(data.session)
+      setAccessState(data.session ? 'checking' : 'idle')
       setIsError(Boolean(error))
       setMessage(error ? 'Não foi possível validar sua sessão. Tente novamente.' : '')
       setIsCheckingSession(false)
@@ -30,6 +34,7 @@ export default function AuthGate({ children }: AuthGateProps) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!active) return
       setSession(nextSession)
+      setAccessState(nextSession ? 'checking' : 'idle')
       setIsCheckingSession(false)
     })
 
@@ -39,32 +44,47 @@ export default function AuthGate({ children }: AuthGateProps) {
     }
   }, [])
 
+  useEffect(() => {
+    if (!session || accessState !== 'checking') return
+
+    let active = true
+    void supabase.rpc('nxgeo_current_user_is_allowed').then(({ data, error }) => {
+      if (!active) return
+      setAccessState(error ? 'error' : data === true ? 'allowed' : 'denied')
+    })
+
+    return () => {
+      active = false
+    }
+  }, [accessState, session])
+
   async function requestMagicLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setIsSending(true)
     setIsError(false)
     setMessage('')
 
+    const normalizedEmail = email.trim().toLowerCase()
     const redirectPath = import.meta.env.BASE_URL.replace(/\/$/, '')
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        emailRedirectTo: `${window.location.origin}${redirectPath}`,
-        shouldCreateUser: false,
-      },
-    })
+    try {
+      await supabase.auth.signInWithOtp({
+        email: normalizedEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}${redirectPath}`,
+          shouldCreateUser: true,
+        },
+      })
 
-    if (error) {
+      setMessage('Se este e-mail estiver autorizado, enviaremos um link de acesso. Verifique também o spam.')
+    } catch {
       setIsError(true)
-      setMessage('Não foi possível enviar o acesso. Confirme o e-mail ou fale com a equipe NX.')
-    } else {
-      setMessage('Enviamos um link de acesso. Verifique sua caixa de entrada e o spam.')
+      setMessage('Não foi possível contatar o serviço de acesso. Tente novamente em instantes.')
+    } finally {
+      setIsSending(false)
     }
-
-    setIsSending(false)
   }
 
-  if (isCheckingSession) {
+  if (isCheckingSession || (session && accessState === 'checking')) {
     return (
       <main className="auth-shell auth-loading" aria-live="polite">
         <LoaderCircle className="auth-spinner" aria-hidden="true" />
@@ -73,7 +93,37 @@ export default function AuthGate({ children }: AuthGateProps) {
     )
   }
 
-  if (session) return children
+  if (session && accessState === 'allowed') return children
+
+  if (session && accessState === 'denied') {
+    return (
+      <main className="auth-shell">
+        <section className="auth-card" aria-labelledby="auth-denied-title">
+          <div className="auth-lock" aria-hidden="true"><LockKeyhole size={28} /></div>
+          <h1 id="auth-denied-title">Acesso não autorizado</h1>
+          <p>Este e-mail não está liberado para o NXGEO ou teve o acesso desativado.</p>
+          <button className="auth-secondary-action" type="button" onClick={() => void supabase.auth.signOut()}>
+            Usar outro e-mail
+          </button>
+        </section>
+      </main>
+    )
+  }
+
+  if (session && accessState === 'error') {
+    return (
+      <main className="auth-shell">
+        <section className="auth-card" aria-labelledby="auth-error-title">
+          <div className="auth-lock" aria-hidden="true"><LockKeyhole size={28} /></div>
+          <h1 id="auth-error-title">Não foi possível validar o acesso</h1>
+          <p>Tente novamente. Se o problema continuar, fale com a equipe NX.</p>
+          <button className="auth-secondary-action" type="button" onClick={() => setAccessState('checking')}>
+            Tentar novamente
+          </button>
+        </section>
+      </main>
+    )
+  }
 
   return (
     <main className="auth-shell">
