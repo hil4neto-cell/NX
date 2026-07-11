@@ -70,12 +70,13 @@ span {
 
 .btn-primary {
     background-color: var(--primary-orange);
-    color: #fff;
+    color: #0a0e17;
     box-shadow: 0 4px 15px var(--primary-orange-glow);
 }
 
 .btn-primary:hover {
     background-color: #ea580c;
+    color: #0a0e17;
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(234, 88, 12, 0.6);
 }
@@ -105,7 +106,7 @@ span {
 
 .btn-whatsapp {
     background-color: #25D366;
-    color: #fff;
+    color: #052e16;
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -120,7 +121,7 @@ span {
 /* CTA WhatsApp Button — green with subtle pulse */
 .btn-cta-whatsapp {
     background: #25D366;
-    color: #fff;
+    color: #052e16;
     border: none;
     border-radius: 50px;
     padding: 0.9rem 1.8rem;
@@ -149,6 +150,27 @@ span {
 
 .btn-block {
     width: 100%;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 /* Navbar */
@@ -783,6 +805,18 @@ section {
     margin-bottom: 1.5rem;
 }
 
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 .input-group input,
 .input-group select,
 .input-group textarea {
@@ -803,6 +837,17 @@ section {
     outline: none;
     border-color: var(--primary-orange);
     background: rgba(0,0,0,0.5);
+}
+
+.whatsapp-submit {
+    justify-content: center;
+}
+
+.form-note {
+    margin-top: 0.85rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-align: center;
 }
 
 /* Footer */
@@ -1086,4 +1131,3 @@ footer {
         opacity: 1 !important;
     }
 }
-

@@ -69,12 +69,46 @@ const observer = new IntersectionObserver((entries, observer) => {
 const animatedElements = document.querySelectorAll('.fade-up, .fade-in-left, .fade-in-right');
 animatedElements.forEach(el => observer.observe(el));
 
-// Form Submission handling (prevent default for demo)
-const contactForm = document.querySelector('.contact-form form');
-if (contactForm) {
-    contactForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        alert('Mensagem enviada com sucesso! (Demonstração)');
-        contactForm.reset();
+// Give direct WhatsApp buttons useful context instead of opening an empty chat.
+const directContactContext = window.location.pathname.includes('corporativo')
+    ? 'Olá, vim pela página de Empresas e Governo da NX Projetos e gostaria de falar sobre uma demanda técnica.'
+    : 'Olá, vim pela página de Pessoa Física da NX Projetos e gostaria de falar sobre meu imóvel.';
+
+document.querySelectorAll('a[href^="https://wa.me/5598991424677"]').forEach((link) => {
+    const whatsappUrl = new URL(link.href);
+    if (!whatsappUrl.searchParams.has('text')) {
+        whatsappUrl.searchParams.set('text', directContactContext);
+        link.href = whatsappUrl.toString();
+    }
+});
+
+// Open WhatsApp with the contact request already organized for the NX team.
+document.querySelectorAll('[data-whatsapp-form]').forEach((contactForm) => {
+    contactForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(contactForm);
+        const origin = contactForm.dataset.origin || 'Site NX Projetos';
+        const name = String(formData.get('name') || '').trim();
+        const location = String(formData.get('location') || '').trim();
+        const service = String(formData.get('service') || '').trim();
+        const message = String(formData.get('message') || '').trim();
+
+        const whatsappMessage = [
+            'Olá, vim pelo site da NX Projetos.',
+            '',
+            `Nome: ${name}`,
+            `Serviço: ${service}`,
+            `Local: ${location}`,
+            `Mensagem: ${message}`,
+            `Origem: ${origin}`,
+        ].join('\n');
+
+        const whatsappUrl = `https://wa.me/5598991424677?text=${encodeURIComponent(whatsappMessage)}`;
+        const whatsappWindow = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+
+        if (!whatsappWindow) {
+            window.location.href = whatsappUrl;
+        }
     });
-}
+});

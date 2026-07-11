@@ -1,0 +1,7 @@
+{
+  "name": "nx-site",
+  "private": true,
+  "scripts": {
+    "build": "sh scripts/build-site.sh"
+  }
+}
