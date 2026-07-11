@@ -510,10 +510,10 @@
   width: 100%;
   min-height: 98px;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 20px;
+  grid-template-columns: 44px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
-  padding: 16px;
+  padding: 16px 62px 16px 16px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -548,10 +548,6 @@
   margin-top: 7px;
   color: var(--workspace-muted);
   font-size: 11px;
-}
-
-.folder-arrow {
-  color: #536075;
 }
 
 .folder-card .workspace-card-menu {

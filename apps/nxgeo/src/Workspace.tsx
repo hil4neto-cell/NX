@@ -3,7 +3,6 @@ import {
   Archive,
   ArrowLeft,
   ChevronDown,
-  ChevronRight,
   CircleUserRound,
   Download,
   Ellipsis,
@@ -581,7 +580,6 @@ export default function Workspace() {
                             <strong>{folder.name}</strong>
                             <span>{mapCountByFolder[folder.id] ?? 0} {(mapCountByFolder[folder.id] ?? 0) === 1 ? 'mapa' : 'mapas'}</span>
                           </div>
-                          <ChevronRight className="folder-arrow" size={18} aria-hidden="true" />
                         </button>
                         {isAdmin && (
                           <div className="workspace-card-menu">
