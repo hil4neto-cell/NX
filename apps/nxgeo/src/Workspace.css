@@ -124,19 +124,17 @@
 }
 
 .workspace-account {
-  margin-top: auto;
   min-width: 0;
+  flex: 0 0 auto;
   position: relative;
 }
 
 .workspace-profile-trigger {
-  width: 100%;
-  min-height: 50px;
+  width: 42px;
+  min-height: 42px;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) 16px;
-  align-items: center;
-  gap: 10px;
-  padding: 0 10px;
+  place-items: center;
+  padding: 0;
   border: 1px solid var(--workspace-border);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.018);
@@ -153,13 +151,10 @@
   color: #ffffff;
 }
 
-.workspace-profile-trigger > span,
 .workspace-account-menu-identity {
   min-width: 0;
 }
 
-.workspace-profile-trigger strong,
-.workspace-profile-trigger small,
 .workspace-account-menu-identity strong,
 .workspace-account-menu-identity span {
   display: block;
@@ -168,12 +163,10 @@
   white-space: nowrap;
 }
 
-.workspace-profile-trigger strong,
 .workspace-account-menu-identity strong {
   font-size: 12px;
 }
 
-.workspace-profile-trigger small,
 .workspace-account-menu-identity span {
   margin-top: 3px;
   color: var(--workspace-muted);
@@ -184,7 +177,7 @@
   position: absolute;
   z-index: 45;
   right: 0;
-  bottom: calc(100% + 8px);
+  top: calc(100% + 8px);
   width: min(260px, calc(100vw - 32px));
   padding: 8px;
   border: 1px solid rgba(255, 255, 255, 0.13);
@@ -245,6 +238,8 @@
 
 .workspace-search {
   width: min(100%, 360px);
+  min-width: 0;
+  flex: 1 1 240px;
   min-height: 42px;
   display: flex;
   align-items: center;
@@ -1114,31 +1109,9 @@
     background: transparent;
   }
 
-  .workspace-account {
-    margin: 0;
-    border: 0;
-    background: transparent;
-  }
-
   .workspace-profile-trigger {
     width: 38px;
     min-height: 38px;
-    display: grid;
-    grid-template-columns: 1fr;
-    place-items: center;
-    padding: 0;
-    border: 1px solid var(--workspace-border);
-  }
-
-  .workspace-profile-trigger > span,
-  .workspace-profile-trigger > svg:last-child {
-    display: none;
-  }
-
-  .workspace-account-menu {
-    right: 0;
-    bottom: auto;
-    top: calc(100% + 8px);
   }
 
   .workspace-topbar {

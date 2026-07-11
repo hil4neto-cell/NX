@@ -487,27 +487,6 @@ export default function Workspace() {
           )}
         </nav>
 
-        <div className="workspace-account">
-          <button className="workspace-profile-trigger" type="button" onClick={() => {
-            setShowAccountMenu((current) => !current)
-            setShowNewMenu(false)
-            setOpenFolderMenuId(null)
-            setOpenMapMenuId(null)
-          }} aria-label="Abrir menu da conta" aria-expanded={showAccountMenu} aria-haspopup="menu">
-            <CircleUserRound size={19} aria-hidden="true" />
-            <span>
-              <strong>{member.display_name || member.email}</strong>
-              <small>{member.role === 'admin' ? 'Administrador' : 'Usuário'}</small>
-            </span>
-            <ChevronDown size={15} aria-hidden="true" />
-          </button>
-          {showAccountMenu && (
-            <div className="workspace-account-menu" role="menu">
-              <div className="workspace-account-menu-identity"><strong>{member.display_name || member.email}</strong><span>{member.email}</span></div>
-              <button type="button" role="menuitem" onClick={() => void supabase.auth.signOut()}><LogOut size={16} aria-hidden="true" /> Sair do NXGEO</button>
-            </div>
-          )}
-        </div>
       </aside>
 
       <section className="workspace-content">
@@ -531,6 +510,22 @@ export default function Workspace() {
               <div className="workspace-action-menu workspace-new-menu" role="menu">
                 {isAdmin && <button type="button" role="menuitem" onClick={() => { setShowNewMenu(false); setShowFolderModal(true) }}><Folder size={16} aria-hidden="true" /> Nova pasta</button>}
                 <button type="button" role="menuitem" onClick={() => openNewMapModal()} disabled={folders.length === 0}><MapIcon size={16} aria-hidden="true" /> Novo mapa</button>
+              </div>
+            )}
+          </div>
+          <div className="workspace-account">
+            <button className="workspace-profile-trigger" type="button" onClick={() => {
+              setShowAccountMenu((current) => !current)
+              setShowNewMenu(false)
+              setOpenFolderMenuId(null)
+              setOpenMapMenuId(null)
+            }} aria-label="Abrir menu da conta" aria-expanded={showAccountMenu} aria-haspopup="menu">
+              <CircleUserRound size={19} aria-hidden="true" />
+            </button>
+            {showAccountMenu && (
+              <div className="workspace-account-menu" role="menu">
+                <div className="workspace-account-menu-identity"><strong>{member.display_name || member.email}</strong><span>{member.role === 'admin' ? 'Administrador' : 'Usuário'} · {member.email}</span></div>
+                <button type="button" role="menuitem" onClick={() => void supabase.auth.signOut()}><LogOut size={16} aria-hidden="true" /> Sair do NXGEO</button>
               </div>
             )}
           </div>
