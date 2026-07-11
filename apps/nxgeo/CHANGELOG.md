@@ -7,7 +7,14 @@ Registro manual de mudancas importantes. Data base: 2026-07-09.
 - Preparado build do NXGEO na rota `/nxgeo` do site institucional.
 - Marca NX no aplicativo passou a voltar para o site principal.
 - Adicionada atribuicao da base cartografica e dos rotulos no rodape do PNG 4K.
-- Rota publica marcada como `noindex` enquanto a autenticacao ainda nao foi implementada.
+- Rota tecnica marcada como `noindex` para nao aparecer em mecanismos de busca.
+
+## 2026-07-11 - Autenticacao com Supabase
+
+- Adicionada tela de acesso restrito por link magico enviado ao e-mail.
+- Cadastro automatico permanece desabilitado no cliente; somente usuarios previamente autorizados podem solicitar acesso.
+- Sessao fica persistida e e renovada automaticamente no navegador.
+- Adicionado botao Sair ao painel do NXGEO.
 
 ## 2026-07-09 - Documentacao de retomada
 

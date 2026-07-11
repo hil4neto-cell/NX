@@ -57,6 +57,8 @@ O usuario final nao deve ver uma marcacao laranja agressiva como primeira leitur
 
 ## Funcionalidades atuais
 
+- Acesso por link magico de e-mail com Supabase Auth.
+- Sessao persistente no navegador e botao de saida no painel.
 - Upload de planta PNG/JPG/SVG como imagem raster sobre o mapa.
 - Entrada manual de quatro pontos em UTM ou Lat/Lon.
 - Conversao UTM para WGS84 via proj4.

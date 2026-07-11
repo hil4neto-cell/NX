@@ -18,6 +18,7 @@ import {
   FileImage,
   FileText,
   FolderOpen,
+  LogOut,
   Palette,
   RotateCcw,
   Satellite,
@@ -25,6 +26,7 @@ import {
   Upload,
 } from 'lucide-react'
 import './App.css'
+import { supabase } from './supabase'
 
 type Coordinate = [number, number]
 type FourCoordinates = [Coordinate, Coordinate, Coordinate, Coordinate]
@@ -1963,6 +1965,10 @@ function App() {
             <p>GEO</p>
             <span>projetos, regularizacoes e territorio</span>
           </div>
+          <button className="brand-signout" type="button" onClick={() => void supabase.auth.signOut()} title="Sair do NXGEO">
+            <LogOut size={16} aria-hidden="true" />
+            <span>Sair</span>
+          </button>
         </header>
 
         <section className="control-group">

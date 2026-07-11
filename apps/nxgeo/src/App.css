@@ -88,6 +88,40 @@
   letter-spacing: 1px;
 }
 
+.brand-signout {
+  margin-left: auto;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--nx-border);
+  border-radius: 7px;
+  background: var(--nx-control);
+  color: var(--nx-muted);
+  cursor: pointer;
+}
+
+.brand-signout:hover {
+  border-color: var(--nx-border-strong);
+  color: var(--nx-text);
+}
+
+.brand-signout:focus-visible {
+  outline: 2px solid var(--nx-orange);
+  outline-offset: 3px;
+}
+
+.brand-signout span {
+  margin: 0;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .control-group {
   border: 1px solid var(--nx-border);
   border-radius: 8px;
