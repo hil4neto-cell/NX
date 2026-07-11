@@ -2,6 +2,19 @@
 
 Registro manual de mudancas importantes. Data base: 2026-07-09.
 
+## 2026-07-11 - Workspace de projetos e equipe
+
+- Adicionado painel receptivo com saudacao, busca, pastas e mapas recentes.
+- Marcelo (`marcelo.topografia@gmail.com`) definido como administrador inicial.
+- Adicionados papeis simples `admin` e `user`, com protecao do ultimo administrador ativo.
+- Administradores podem convidar pessoas, promover outros admins, bloquear acessos e atribuir pastas.
+- Usuarios comuns enxergam somente as pastas compartilhadas com eles.
+- Mapas agora podem ser salvos em Storage privado com estado, miniatura e ultimo PNG 4K.
+- Adicionado download rapido da imagem salva sem precisar abrir o editor.
+- Adicionados revisionamento contra sobrescrita, soft delete, auditoria e RLS em tabelas e arquivos.
+- Editor passou a carregar sob demanda para deixar a abertura do painel mais leve.
+- Tela de login revisada como plataforma de trabalho, com linguagem simples e visual sutil.
+
 ## 2026-07-11 - Integracao ao site e atribuicao cartografica
 
 - Preparado build do NXGEO na rota `/nxgeo` do site institucional.

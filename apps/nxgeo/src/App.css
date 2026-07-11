@@ -44,8 +44,12 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 13px;
+  gap: 10px;
   padding: 4px 0 12px;
+}
+
+.brand > div:not(.editor-brand-actions) {
+  min-width: 0;
 }
 
 .brand-mark {
@@ -86,6 +90,73 @@
   margin-top: 3px;
   text-transform: uppercase;
   letter-spacing: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-back,
+.editor-save {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--nx-border);
+  border-radius: 7px;
+  background: var(--nx-control);
+  color: var(--nx-muted);
+  cursor: pointer;
+}
+
+.editor-back {
+  width: 36px;
+  flex: 0 0 36px;
+  padding: 0;
+}
+
+.editor-save {
+  padding: 0 10px;
+  border-color: rgba(249, 115, 22, 0.45);
+  background: rgba(249, 115, 22, 0.12);
+  color: #fed7aa;
+  font-weight: 800;
+}
+
+.editor-save:hover:not(:disabled),
+.editor-back:hover {
+  border-color: var(--nx-orange);
+  color: var(--nx-text);
+}
+
+.editor-save:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.editor-back:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.editor-brand-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.editor-brand-actions .brand-signout {
+  margin-left: 0;
+}
+
+.editor-save-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(254, 215, 170, 0.3);
+  border-top-color: #fed7aa;
+  border-radius: 50%;
+  animation: editor-save-spin 0.8s linear infinite;
 }
 
 .brand-signout {
@@ -101,6 +172,10 @@
   background: var(--nx-control);
   color: var(--nx-muted);
   cursor: pointer;
+}
+
+@keyframes editor-save-spin {
+  to { transform: rotate(360deg); }
 }
 
 .brand-signout:hover {
@@ -557,6 +632,17 @@ textarea:focus-visible {
 
   .brand span {
     font-size: 11px;
+  }
+
+  .editor-save,
+  .editor-brand-actions .brand-signout {
+    width: 36px;
+    padding: 0;
+  }
+
+  .editor-save span:not(.editor-save-spinner),
+  .editor-brand-actions .brand-signout span {
+    display: none;
   }
 
   .utm-row,

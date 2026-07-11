@@ -10,6 +10,8 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flowType: 'pkce',
+    // Convites sao abertos em outro navegador; o fluxo implicito e o formato
+    // compativel com os links enviados pelo Auth Admin do Supabase.
+    flowType: 'implicit',
   },
 })

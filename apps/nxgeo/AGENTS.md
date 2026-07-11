@@ -58,7 +58,12 @@ O usuario final nao deve ver uma marcacao laranja agressiva como primeira leitur
 ## Funcionalidades atuais
 
 - Acesso por link magico de e-mail com Supabase Auth.
-- Autorizacao por allowlist SQL em `public.nxgeo_allowed_emails`, aplicada por Auth Hook antes de criar o usuario e verificada novamente depois da sessao.
+- Autorizacao por `public.nxgeo_members`, aplicada por Auth Hook antes de criar o usuario e verificada novamente depois da sessao.
+- Marcelo (`marcelo.topografia@gmail.com`) e o administrador inicial.
+- Papeis de produto: `admin` gerencia equipe e todas as pastas; `user` trabalha somente nas pastas atribuidas.
+- Painel com saudacao, pastas, mapas recentes, miniaturas e download rapido do ultimo PNG salvo.
+- Mapas, miniaturas e exports ficam no bucket privado `nxgeo-workspace`, protegidos pela permissao da pasta.
+- Alteracoes de equipe, pastas e mapas geram auditoria; exclusoes usam soft delete.
 - Sessao persistente no navegador e botao de saida no painel.
 - Upload de planta PNG/JPG/SVG como imagem raster sobre o mapa.
 - Entrada manual de quatro pontos em UTM ou Lat/Lon.

@@ -10,6 +10,7 @@ import maplibregl, {
 import 'maplibre-gl/dist/maplibre-gl.css'
 import proj4 from 'proj4'
 import {
+  ArrowLeft,
   BringToFront,
   Crosshair,
   Download,
@@ -22,6 +23,7 @@ import {
   Palette,
   RotateCcw,
   Satellite,
+  Save,
   Undo2,
   Upload,
 } from 'lucide-react'
@@ -73,14 +75,18 @@ type Corner = {
   short: string
 }
 
-type SavedProject = {
+export type SavedProject = {
+  schemaVersion?: number
   name: string
   createdAt: string
+  updatedAt?: string
   imageUrl: string
   hasControlGeometry?: boolean
   opacity: number
   zone: number
   hemisphere: 'N' | 'S'
+  coordinateMode?: CoordinateMode
+  coordinateInputs?: string[]
   corners: FourCoordinates
   metadata: ProjectMetadata
   surveyPoints?: SurveyPoint[]
@@ -89,6 +95,17 @@ type SavedProject = {
   satellite?: boolean
   satelliteVariant?: SatelliteVariant
   streetNames?: boolean
+  viewport?: {
+    bounds: [Coordinate, Coordinate]
+  }
+}
+
+type MapEditorProps = {
+  initialProject?: SavedProject
+  workspaceTitle?: string
+  onBack?: () => void
+  onSaveProject?: (project: SavedProject) => Promise<number>
+  onSaveExport?: (exportImage: Blob, revision: number) => Promise<void>
 }
 
 type AppSnapshot = {
@@ -1137,9 +1154,21 @@ function normalizeLabel(value: string, fallback: string) {
   return value.trim() || fallback
 }
 
-function waitForMapIdle(map: maplibregl.Map) {
-  return new Promise<void>((resolve) => {
-    const done = () => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
+function waitForMapIdle(map: maplibregl.Map, timeoutMs = 45000) {
+  return new Promise<void>((resolve, reject) => {
+    let settled = false
+    const timer = window.setTimeout(() => {
+      if (settled) return
+      settled = true
+      map.off('idle', done)
+      reject(new Error('Tempo esgotado ao preparar os detalhes do mapa. Tente novamente.'))
+    }, timeoutMs)
+    const done = () => window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      resolve()
+    }))
     if (map.loaded() && map.areTilesLoaded()) {
       done()
       return
@@ -1148,37 +1177,52 @@ function waitForMapIdle(map: maplibregl.Map) {
   })
 }
 
-function App() {
+function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExport }: MapEditorProps) {
+  const hasWorkspaceSave = Boolean(onSaveProject)
+  const startingMetadata = initialProject
+    ? { ...defaultMetadata, ...initialProject.metadata }
+    : { ...defaultMetadata, projectName: workspaceTitle || defaultMetadata.projectName }
+  const startingCorners = initialProject?.corners ?? defaultCorners
+  const startingOverlayOptions = { ...defaultOverlayOptions, ...(initialProject?.overlayOptions ?? {}) }
   const mapRef = useRef<maplibregl.Map | null>(null)
   const mapNodeRef = useRef<HTMLDivElement | null>(null)
   const markersRef = useRef<Marker[]>([])
+  const projectCreatedAtRef = useRef(initialProject?.createdAt ?? new Date().toISOString())
   const initialMapRef = useRef({
-    imageUrl: emptyPlanImage,
-    corners: defaultCorners,
-    opacity: 0,
-    satellite: true,
-    streetNames: true,
+    imageUrl: initialProject?.imageUrl ?? emptyPlanImage,
+    corners: startingCorners,
+    opacity: initialProject?.opacity ?? (initialProject ? 0.62 : 0),
+    satellite: initialProject?.satellite ?? true,
+    satelliteVariant: initialProject?.satelliteVariant ?? 'esri',
+    streetNames: initialProject?.streetNames ?? true,
+    viewport: initialProject?.viewport,
   })
-  const [imageUrl, setImageUrl] = useState(emptyPlanImage)
-  const [imageName, setImageName] = useState('Nenhum arquivo carregado')
-  const [hasControlGeometry, setHasControlGeometry] = useState(false)
-  const [corners, setCorners] = useState<FourCoordinates>(defaultCorners)
-  const [inputs, setInputs] = useState(emptyInputs)
-  const [mode, setMode] = useState<CoordinateMode>('utm')
-  const [zone, setZone] = useState(23)
-  const [hemisphere, setHemisphere] = useState<'N' | 'S'>('S')
-  const [opacity, setOpacity] = useState(0.62)
-  const [satellite, setSatellite] = useState(true)
-  const [satelliteVariant, setSatelliteVariant] = useState<SatelliteVariant>('esri')
-  const [streetNames, setStreetNames] = useState(true)
-  const [metadata, setMetadata] = useState<ProjectMetadata>(defaultMetadata)
-  const [surveyPoints, setSurveyPoints] = useState<SurveyPoint[]>([])
-  const [importedGeometries, setImportedGeometries] = useState<ImportedGeometry[]>([])
-  const [overlayOptions, setOverlayOptions] = useState<OverlayOptions>(defaultOverlayOptions)
-  const [status, setStatus] = useState('Comece importando PDNEZ/TXT, KML/KMZ, DXF ou carregando uma imagem da planta.')
+  const [imageUrl, setImageUrl] = useState(initialProject?.imageUrl ?? emptyPlanImage)
+  const [imageName, setImageName] = useState(initialProject?.name ?? 'Nenhum arquivo carregado')
+  const [hasControlGeometry, setHasControlGeometry] = useState(initialProject?.hasControlGeometry ?? false)
+  const [corners, setCorners] = useState<FourCoordinates>(startingCorners)
+  const [inputs, setInputs] = useState(initialProject?.coordinateInputs ?? (initialProject ? startingCorners.map(coordinateToInput) : emptyInputs))
+  const [mode, setMode] = useState<CoordinateMode>(initialProject?.coordinateMode ?? (initialProject ? 'latlon' : 'utm'))
+  const [zone, setZone] = useState(initialProject?.zone ?? 23)
+  const [hemisphere, setHemisphere] = useState<'N' | 'S'>(initialProject?.hemisphere ?? 'S')
+  const [opacity, setOpacity] = useState(initialProject?.opacity ?? 0.62)
+  const [satellite, setSatellite] = useState(initialProject?.satellite ?? true)
+  const [satelliteVariant, setSatelliteVariant] = useState<SatelliteVariant>(initialProject?.satelliteVariant ?? 'esri')
+  const [streetNames, setStreetNames] = useState(initialProject?.streetNames ?? true)
+  const [metadata, setMetadata] = useState<ProjectMetadata>(startingMetadata)
+  const [surveyPoints, setSurveyPoints] = useState<SurveyPoint[]>(initialProject?.surveyPoints ?? [])
+  const [importedGeometries, setImportedGeometries] = useState<ImportedGeometry[]>(initialProject?.importedGeometries ?? [])
+  const [overlayOptions, setOverlayOptions] = useState<OverlayOptions>(startingOverlayOptions)
+  const [status, setStatus] = useState(initialProject
+    ? 'Mapa salvo aberto. Continue o trabalho ou prepare uma nova imagem.'
+    : 'Comece importando PDNEZ/TXT, KML/KMZ, DXF ou carregando uma imagem da planta.')
   const [isExporting4k, setIsExporting4k] = useState(false)
+  const [isSavingWorkspace, setIsSavingWorkspace] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [mapReady, setMapReady] = useState(false)
   const export4kLockRef = useRef(false)
+  const canMarkDirtyRef = useRef(false)
+  const changeVersionRef = useRef(0)
   const undoStackRef = useRef<AppSnapshot[]>([])
   const [canUndo, setCanUndo] = useState(false)
   const latestMapStateRef = useRef({
@@ -1208,13 +1252,17 @@ function App() {
   }
 
   const project = useMemo<SavedProject>(() => ({
+    schemaVersion: 2,
     name: imageName,
-    createdAt: new Date().toISOString(),
+    createdAt: projectCreatedAtRef.current,
+    updatedAt: new Date().toISOString(),
     imageUrl,
     hasControlGeometry,
     opacity,
     zone,
     hemisphere,
+    coordinateMode: mode,
+    coordinateInputs: inputs,
     corners,
     metadata,
     surveyPoints,
@@ -1223,7 +1271,31 @@ function App() {
     satellite,
     satelliteVariant,
     streetNames,
-  }), [corners, hasControlGeometry, hemisphere, imageName, imageUrl, importedGeometries, metadata, opacity, overlayOptions, satellite, satelliteVariant, streetNames, surveyPoints, zone])
+  }), [corners, hasControlGeometry, hemisphere, imageName, imageUrl, importedGeometries, inputs, metadata, mode, opacity, overlayOptions, satellite, satelliteVariant, streetNames, surveyPoints, zone])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      canMarkDirtyRef.current = true
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    if (canMarkDirtyRef.current && hasWorkspaceSave) {
+      changeVersionRef.current += 1
+      setHasUnsavedChanges(true)
+    }
+  }, [hasWorkspaceSave, project])
+
+  useEffect(() => {
+    if (!hasUnsavedChanges || !hasWorkspaceSave) return
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warnBeforeLeaving)
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
+  }, [hasUnsavedChanges, hasWorkspaceSave])
 
   const makeSnapshot = useCallback((): AppSnapshot => {
     return {
@@ -1289,10 +1361,12 @@ function App() {
     if (!mapNodeRef.current || mapRef.current) return
 
     const initial = initialMapRef.current
+    let viewportTrackingReady = false
+    let viewportTrackingTimer = 0
     const map = new maplibregl.Map({
       container: mapNodeRef.current,
-      style: makeStyle(initial.satellite, 'esri', initial.streetNames),
-      center: defaultCorners[0] as LngLatLike,
+      style: makeStyle(initial.satellite, initial.satelliteVariant, initial.streetNames),
+      center: initial.corners[0] as LngLatLike,
       zoom: 15.5,
       attributionControl: false,
     })
@@ -1416,25 +1490,44 @@ function App() {
       map.setCenter([-47.88, -15.79])
       map.setZoom(4)
       setMapReady(true)
-      window.requestAnimationFrame(() => fitMapToCoordinates(
-        map,
-        [
-          ...(latest.hasControlGeometry ? latest.corners : []),
-          ...collectImportedCoordinates(latest.importedGeometries),
-        ],
-        satelliteMaxZoom(latest.satellite, latest.satelliteVariant),
-      ))
+      window.requestAnimationFrame(() => {
+        if (initial.viewport) {
+          map.fitBounds(initial.viewport.bounds, { padding: 0, duration: 0 })
+        } else {
+          fitMapToCoordinates(
+            map,
+            [
+              ...(latest.hasControlGeometry ? latest.corners : []),
+              ...collectImportedCoordinates(latest.importedGeometries),
+            ],
+            satelliteMaxZoom(latest.satellite, latest.satelliteVariant),
+          )
+        }
+        viewportTrackingTimer = window.setTimeout(() => {
+          viewportTrackingReady = true
+        }, 500)
+      })
     })
+
+    const markViewportDirty = () => {
+      if (viewportTrackingReady && canMarkDirtyRef.current && hasWorkspaceSave) {
+        changeVersionRef.current += 1
+        setHasUnsavedChanges(true)
+      }
+    }
+    map.on('moveend', markViewportDirty)
 
     mapRef.current = map
 
     return () => {
+      window.clearTimeout(viewportTrackingTimer)
+      map.off('moveend', markViewportDirty)
       markersRef.current.forEach((marker) => marker.remove())
       map.remove()
       mapRef.current = null
       setMapReady(false)
     }
-  }, [])
+  }, [hasWorkspaceSave])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -1699,11 +1792,7 @@ function App() {
   }
 
 
-  async function exportImage4k() {
-    if (export4kLockRef.current) return
-    export4kLockRef.current = true
-    setIsExporting4k(true)
-    setStatus('Renderizando mapa 4K com as coordenadas atuais. Isso pode levar alguns segundos.')
+  async function renderImage4k() {
     const sourceMap = mapRef.current
     const visibleBounds = sourceMap?.getBounds()
     const currentBounds = visibleBounds
@@ -1866,16 +1955,91 @@ function App() {
       )
       const png = await canvasToPngBlob(exportCanvas)
       const fileName = exportPngName(metadata)
+      return {
+        png,
+        fileName,
+        viewport: { bounds: [sw, ne] as [Coordinate, Coordinate] },
+      }
+    } catch (error) {
+      throw error instanceof Error ? error : new Error('Nao consegui exportar a imagem 4K.')
+    } finally {
+      exportMap?.remove()
+      container.remove()
+    }
+  }
+
+  async function exportImage4k() {
+    if (export4kLockRef.current) return
+    export4kLockRef.current = true
+    setIsExporting4k(true)
+    setStatus('Renderizando mapa 4K com as coordenadas atuais. Isso pode levar alguns segundos.')
+
+    try {
+      const { png, fileName } = await renderImage4k()
       downloadBlob(fileName, png)
       setStatus(`PNG 4K exportado com a area visivel atual do mapa: ${fileName}.`)
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Nao consegui exportar a imagem 4K.')
     } finally {
-      exportMap?.remove()
-      container.remove()
       export4kLockRef.current = false
       setIsExporting4k(false)
     }
+  }
+
+  async function saveWorkspaceProject() {
+    if (!onSaveProject || export4kLockRef.current) return
+    export4kLockRef.current = true
+    setIsSavingWorkspace(true)
+    setStatus('Salvando o mapa no painel…')
+    const savingVersion = changeVersionRef.current
+
+    try {
+      const visibleBounds = mapRef.current?.getBounds()
+      const viewport = visibleBounds
+        ? {
+            bounds: [
+              [visibleBounds.getWest(), visibleBounds.getSouth()],
+              [visibleBounds.getEast(), visibleBounds.getNorth()],
+            ] as [Coordinate, Coordinate],
+          }
+        : project.viewport
+      const revision = await onSaveProject({
+        ...project,
+        schemaVersion: 2,
+        createdAt: projectCreatedAtRef.current,
+        updatedAt: new Date().toISOString(),
+        viewport,
+      })
+      if (changeVersionRef.current !== savingVersion) {
+        setStatus('Mapa salvo. Existem alteracoes mais recentes; salve novamente para atualizar a imagem rapida.')
+        return
+      }
+      setHasUnsavedChanges(false)
+      setStatus('Mapa salvo. Preparando a imagem rápida para o painel…')
+
+      if (onSaveExport) {
+        try {
+          const { png } = await renderImage4k()
+          await onSaveExport(png, revision)
+          setStatus('Mapa salvo. A imagem rápida também está pronta no painel.')
+        } catch (exportError) {
+          const reason = exportError instanceof Error ? exportError.message : 'nao foi possivel gerar a imagem'
+          setStatus(`Mapa salvo com seguranca. A imagem rapida nao foi atualizada: ${reason}`)
+        }
+      } else {
+        setStatus('Mapa salvo no painel.')
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Nao consegui salvar o mapa no painel.')
+    } finally {
+      export4kLockRef.current = false
+      setIsSavingWorkspace(false)
+    }
+  }
+
+  function returnToWorkspace() {
+    if (hasUnsavedChanges && !window.confirm('Voltar aos projetos sem salvar as alteracoes deste mapa?')) return
+    onBack?.()
   }
 
   function importProject(file?: File) {
@@ -1901,8 +2065,8 @@ function App() {
         setImportedGeometries(data.importedGeometries ?? [])
         setOverlayOptions({ ...defaultOverlayOptions, ...(data.overlayOptions ?? {}) })
         setCorners(importedCorners)
-        setMode('latlon')
-        setInputs(importedCorners.map(coordinateToInput))
+        setMode(data.coordinateMode ?? 'latlon')
+        setInputs(data.coordinateInputs ?? importedCorners.map(coordinateToInput))
         setStatus('Estudo importado. Ajuste o encaixe ou exporte novamente quando estiver pronto.')
         scheduleFitToData(importedCorners, data.importedGeometries ?? [], data.hasControlGeometry ?? true)
       } catch (error) {
@@ -1960,15 +2124,28 @@ function App() {
     <main className="workspace">
       <aside className="tool-panel" aria-label="Controles de georreferenciamento">
         <header className="brand">
+          {onBack && (
+            <button className="editor-back" type="button" onClick={returnToWorkspace} disabled={isSavingWorkspace} title="Voltar aos projetos" aria-label="Voltar aos projetos">
+              <ArrowLeft size={17} aria-hidden="true" />
+            </button>
+          )}
           <a className="brand-mark" href="/" aria-label="Voltar para o site da NX"><img src={`${import.meta.env.BASE_URL}nx-white.svg`} alt="NX" /></a>
           <div>
             <p>GEO</p>
-            <span>projetos, regularizacoes e territorio</span>
+            <span>{workspaceTitle || 'projetos, regularizacoes e territorio'}</span>
           </div>
-          <button className="brand-signout" type="button" onClick={() => void supabase.auth.signOut()} title="Sair do NXGEO">
-            <LogOut size={16} aria-hidden="true" />
-            <span>Sair</span>
-          </button>
+          <div className="editor-brand-actions">
+            {onSaveProject && (
+              <button className="editor-save" type="button" onClick={() => void saveWorkspaceProject()} disabled={isSavingWorkspace || isExporting4k}>
+                {isSavingWorkspace ? <span className="editor-save-spinner" aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
+                <span>{isSavingWorkspace ? 'Salvando' : 'Salvar'}</span>
+              </button>
+            )}
+            <button className="brand-signout" type="button" onClick={() => void supabase.auth.signOut()} title="Sair do NXGEO">
+              <LogOut size={16} aria-hidden="true" />
+              <span>Sair</span>
+            </button>
+          </div>
         </header>
 
         <section className="control-group">

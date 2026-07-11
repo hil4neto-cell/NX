@@ -1,6 +1,15 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { ArrowLeft, LoaderCircle, LockKeyhole, Mail } from 'lucide-react'
+import {
+  ArrowLeft,
+  Download,
+  FolderOpen,
+  LoaderCircle,
+  LockKeyhole,
+  Mail,
+  Map,
+  ShieldCheck,
+} from 'lucide-react'
 import { supabase } from './supabase'
 import './AuthGate.css'
 
@@ -131,42 +140,68 @@ export default function AuthGate({ children }: AuthGateProps) {
         <ArrowLeft size={17} aria-hidden="true" /> Voltar ao site
       </a>
 
-      <section className="auth-card" aria-labelledby="auth-title">
-        <div className="auth-brand">
-          <img src={`${import.meta.env.BASE_URL}nx-white.svg`} alt="NX" />
-          <div>
-            <strong>GEO</strong>
-            <span>acesso técnico</span>
+      <div className="auth-layout">
+        <section className="auth-intro" aria-labelledby="auth-intro-title">
+          <div className="auth-brand">
+            <img src={`${import.meta.env.BASE_URL}nx-white.svg`} alt="NX" />
+            <div>
+              <strong>GEO</strong>
+              <span>plataforma de trabalho</span>
+            </div>
           </div>
-        </div>
 
-        <div className="auth-lock" aria-hidden="true"><LockKeyhole size={28} /></div>
-        <h1 id="auth-title">Acesso ao NXGEO</h1>
-        <p>Entre com o e-mail autorizado pela equipe NX. Você receberá um link seguro e não precisará criar senha.</p>
+          <p className="auth-eyebrow">Plataforma de trabalho</p>
+          <h1 id="auth-intro-title">Projetos e mapas, em um só lugar.</h1>
+          <p className="auth-intro-copy">
+            Um espaço seguro para organizar projetos, trabalhar com mapas e exportar resultados com clareza.
+          </p>
 
-        <form className="auth-form" onSubmit={requestMagicLink}>
-          <label htmlFor="auth-email">E-mail</label>
-          <div className="auth-input">
-            <Mail size={18} aria-hidden="true" />
-            <input
-              id="auth-email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              placeholder="voce@empresa.com"
-              required
-            />
+          <ul className="auth-benefits" aria-label="Recursos da plataforma">
+            <li><FolderOpen size={19} aria-hidden="true" /><span>Projetos organizados</span></li>
+            <li><Map size={19} aria-hidden="true" /><span>Mapas sempre à mão</span></li>
+            <li><Download size={19} aria-hidden="true" /><span>Exportação rápida</span></li>
+          </ul>
+        </section>
+
+        <section className="auth-card auth-login-card" aria-labelledby="auth-title">
+          <div className="auth-access-label">
+            <ShieldCheck size={17} aria-hidden="true" />
+            <span>Acesso seguro</span>
           </div>
-          <button type="submit" disabled={isSending}>
-            {isSending ? <LoaderCircle className="auth-spinner" size={18} aria-hidden="true" /> : <Mail size={18} aria-hidden="true" />}
-            {isSending ? 'Enviando…' : 'Receber link de acesso'}
-          </button>
-        </form>
 
-        {message && <p className={isError ? 'auth-message error' : 'auth-message'} role="status">{message}</p>}
-        <small>A sessão ficará salva neste navegador até você sair.</small>
-      </section>
+          <h2 id="auth-title">Bem-vindo ao NXGEO</h2>
+          <p>Use o e-mail autorizado para acessar seu espaço de trabalho.</p>
+
+          <form className="auth-form" onSubmit={requestMagicLink}>
+            <label htmlFor="auth-email">E-mail de acesso</label>
+            <div className="auth-input">
+              <Mail size={18} aria-hidden="true" />
+              <input
+                id="auth-email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="nome@empresa.com"
+                required
+              />
+            </div>
+            <button type="submit" disabled={isSending}>
+              {isSending ? <LoaderCircle className="auth-spinner" size={18} aria-hidden="true" /> : <Mail size={18} aria-hidden="true" />}
+              {isSending ? 'Enviando…' : 'Receber link de acesso'}
+            </button>
+          </form>
+
+          {message && <p className={isError ? 'auth-message error' : 'auth-message'} role="status">{message}</p>}
+
+          <div className="auth-helper">
+            <LockKeyhole size={15} aria-hidden="true" />
+            <small>Enviaremos um link seguro. Você não precisa criar senha.</small>
+          </div>
+        </section>
+      </div>
     </main>
   )
 }
