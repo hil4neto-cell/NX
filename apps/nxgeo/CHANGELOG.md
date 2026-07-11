@@ -2,6 +2,17 @@
 
 Registro manual de mudancas importantes. Data base: 2026-07-09.
 
+## 2026-07-11 - Área de trabalho e exportação orientadas ao cliente
+
+- Painel reorganizado com navegação mais sóbria para **Projetos** e **Pessoas**, sem avatar de letra genérica ou botão Sair exposto.
+- A conta agora abre um menu discreto com identificação e saída; as ações principais ficam no botão **Novo**.
+- Pastas e mapas ganharam menu de ações claro: compartilhar uma pasta, arquivar pasta, mover mapa entre pastas e arquivar mapa.
+- Arquivar é uma ação reversível no banco: mantém arquivos e histórico, mas remove o conteúdo da lista de trabalho ativa. A restauração visual pode ser adicionada depois sem perder dados.
+- Usuários trabalham apenas nas pastas que o administrador compartilha; as pastas representam projetos/clientes do espaço de trabalho, e não uma área privada ambígua por usuário.
+- A movimentação de mapas e os arquivamentos passam por RPCs auditáveis no banco, em vez de depender apenas de botões escondidos na interface.
+- **Exportar imagem** agora abre uma moldura fixa com a mesma proporção útil do PNG 4K. A pessoa move/aproxima o mapa por trás dela e confirma o recorte antes de gerar.
+- A exportação não limita artificialmente o zoom da base Esri e usa rótulos de ruas em resolução retina quando disponíveis, melhorando a legibilidade. A fonte Clarity respeita seu limite confiável de detalhe para não produzir áreas transparentes. Para rótulos vetoriais de impressão será necessária uma fonte cartográfica vetorial licenciada em evolução futura.
+
 ## 2026-07-11 - Aplicativo instalável
 
 - NXGEO passou a ter manifest, ícones próprios e abertura em modo aplicativo no desktop e celular.

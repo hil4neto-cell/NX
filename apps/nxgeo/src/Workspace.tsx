@@ -2,9 +2,14 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type FormEve
 import {
   Archive,
   ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  CircleUserRound,
   Download,
+  Ellipsis,
   FileImage,
   Folder,
+  FolderInput,
   FolderOpen,
   LayoutDashboard,
   LoaderCircle,
@@ -12,6 +17,7 @@ import {
   Map as MapIcon,
   Plus,
   Search,
+  Share2,
   ShieldCheck,
   UserPlus,
   Users,
@@ -21,6 +27,7 @@ import type { SavedProject } from './App'
 import PwaInstall from './PwaInstall'
 import { supabase } from './supabase'
 import {
+  archiveFolder,
   archiveMap,
   createFolder,
   createMapPreviewUrls,
@@ -29,6 +36,7 @@ import {
   listMembers,
   loadMapProject,
   loadWorkspace,
+  moveMapToFolder,
   saveMapExport,
   saveMapProject,
   setMemberFolders,
@@ -122,7 +130,15 @@ export default function Workspace() {
   const [showFolderModal, setShowFolderModal] = useState(false)
   const [showMapModal, setShowMapModal] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
+  const [showNewMenu, setShowNewMenu] = useState(false)
+  const [showAccountMenu, setShowAccountMenu] = useState(false)
+  const [openFolderMenuId, setOpenFolderMenuId] = useState<string | null>(null)
+  const [openMapMenuId, setOpenMapMenuId] = useState<string | null>(null)
   const [accessMember, setAccessMember] = useState<WorkspaceMember | null>(null)
+  const [shareFolder, setShareFolder] = useState<WorkspaceFolder | null>(null)
+  const [shareMemberId, setShareMemberId] = useState('')
+  const [mapToMove, setMapToMove] = useState<WorkspaceMap | null>(null)
+  const [moveMapFolderId, setMoveMapFolderId] = useState('')
   const [folderName, setFolderName] = useState('')
   const [folderDescription, setFolderDescription] = useState('')
   const [newMapTitle, setNewMapTitle] = useState('')
@@ -275,13 +291,77 @@ export default function Workspace() {
   }
 
   async function handleArchiveMap(map: WorkspaceMap) {
-    if (!window.confirm(`Mover “${map.title}” para a lixeira?`)) return
+    if (!window.confirm(`Arquivar “${map.title}”? Ele sairá da lista ativa, sem apagar seus arquivos de forma definitiva.`)) return
     setBusyAction(`archive-${map.id}`)
     setError('')
     try {
       await archiveMap(map.id)
       setMaps((current) => current.filter((item) => item.id !== map.id))
-      setNotice('Mapa movido para a lixeira.')
+      setNotice('Mapa arquivado. Ele não aparece mais na lista ativa.')
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Não foi possível mover o mapa.')
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  async function handleArchiveFolder(folder: WorkspaceFolder) {
+    const mapCount = mapCountByFolder[folder.id] ?? 0
+    const mapLabel = mapCount === 1 ? '1 mapa' : `${mapCount} mapas`
+    if (!window.confirm(`Arquivar a pasta “${folder.name}” e ${mapLabel}? O conteúdo deixará a lista ativa, sem exclusão definitiva.`)) return
+
+    setBusyAction(`archive-folder-${folder.id}`)
+    setError('')
+    try {
+      const result = await archiveFolder(folder.id)
+      setFolders((current) => current.filter((item) => item.id !== folder.id))
+      setMaps((current) => current.filter((item) => item.folder_id !== folder.id))
+      setSelectedFolderId((current) => current === folder.id ? null : current)
+      setOpenFolderMenuId(null)
+      const archivedCount = result?.archived_map_count ?? mapCount
+      setNotice(`Pasta arquivada${archivedCount ? ` com ${archivedCount} ${archivedCount === 1 ? 'mapa' : 'mapas'}` : ''}.`)
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Não foi possível arquivar a pasta.')
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  async function handleShareFolder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!shareFolder || !shareMemberId) return
+    const target = members.find((item) => item.id === shareMemberId)
+    if (!target) return
+
+    setBusyAction(`share-folder-${shareFolder.id}`)
+    setError('')
+    try {
+      await setMemberFolders(target.id, [...new Set([...target.folder_ids, shareFolder.id])])
+      setMembers(await listMembers())
+      setNotice(`“${shareFolder.name}” foi compartilhada com ${target.display_name || target.email}.`)
+      setShareFolder(null)
+      setShareMemberId('')
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Não foi possível compartilhar a pasta.')
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  async function handleMoveMap(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!mapToMove || !moveMapFolderId || moveMapFolderId === mapToMove.folder_id) return
+
+    setBusyAction(`move-map-${mapToMove.id}`)
+    setError('')
+    try {
+      const moved = await moveMapToFolder(mapToMove.id, moveMapFolderId)
+      const destination = folders.find((folder) => folder.id === moveMapFolderId)
+      setMaps((current) => [moved, ...current.filter((map) => map.id !== moved.id)])
+      setMapToMove(null)
+      setMoveMapFolderId('')
+      setOpenMapMenuId(null)
+      setNotice(`Mapa movido para ${destination?.name ?? 'a nova pasta'}.`)
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Não foi possível mover o mapa.')
     } finally {
@@ -343,6 +423,7 @@ export default function Workspace() {
   function openNewMapModal(folderId?: string) {
     const nextFolderId = folderId ?? selectedFolderId ?? folders[0]?.id ?? ''
     setNewMapFolderId(nextFolderId)
+    setShowNewMenu(false)
     setShowMapModal(true)
   }
 
@@ -393,46 +474,39 @@ export default function Workspace() {
         </a>
 
         <nav aria-label="Navegação do NXGEO">
-          <button className={view === 'home' ? 'active' : ''} type="button" onClick={() => {
+          <button className={view === 'home' ? 'workspace-nav-primary active' : 'workspace-nav-primary'} type="button" onClick={() => {
             setView('home')
             setSelectedFolderId(null)
           }}>
-            <LayoutDashboard size={18} aria-hidden="true" /> Início
+            <LayoutDashboard size={18} aria-hidden="true" /> Projetos
           </button>
-          <div className="workspace-nav-label">Pastas</div>
-          <button className={view === 'home' && selectedFolderId === null ? 'active subtle' : 'subtle'} type="button" onClick={() => {
-            setView('home')
-            setSelectedFolderId(null)
-          }}>
-            <FolderOpen size={18} aria-hidden="true" /> Todas as pastas
-          </button>
-          {folders.slice(0, 8).map((folder) => (
-            <button key={folder.id} className={selectedFolderId === folder.id ? 'active subtle' : 'subtle'} type="button" onClick={() => {
-              setView('home')
-              setSelectedFolderId(folder.id)
-            }}>
-              <Folder size={18} aria-hidden="true" /> <span>{folder.name}</span>
-            </button>
-          ))}
           {isAdmin && (
-            <>
-              <div className="workspace-nav-label">Administração</div>
-              <button className={view === 'people' ? 'active' : ''} type="button" onClick={() => setView('people')}>
-                <Users size={18} aria-hidden="true" /> Pessoas e acessos
-              </button>
-            </>
+            <button className={view === 'people' ? 'workspace-nav-primary active' : 'workspace-nav-primary'} type="button" onClick={() => setView('people')}>
+              <Users size={18} aria-hidden="true" /> Pessoas
+            </button>
           )}
         </nav>
 
         <div className="workspace-account">
-          <div className="workspace-avatar">{firstName(member.display_name, member.email).slice(0, 1).toUpperCase()}</div>
-          <div>
-            <strong>{member.display_name || member.email}</strong>
-            <span>{member.role === 'admin' ? 'Administrador' : 'Usuário'}</span>
-          </div>
-          <button className="workspace-icon-button" type="button" onClick={() => void supabase.auth.signOut()} aria-label="Sair do NXGEO" title="Sair">
-            <LogOut size={18} aria-hidden="true" />
+          <button className="workspace-profile-trigger" type="button" onClick={() => {
+            setShowAccountMenu((current) => !current)
+            setShowNewMenu(false)
+            setOpenFolderMenuId(null)
+            setOpenMapMenuId(null)
+          }} aria-label="Abrir menu da conta" aria-expanded={showAccountMenu} aria-haspopup="menu">
+            <CircleUserRound size={19} aria-hidden="true" />
+            <span>
+              <strong>{member.display_name || member.email}</strong>
+              <small>{member.role === 'admin' ? 'Administrador' : 'Usuário'}</small>
+            </span>
+            <ChevronDown size={15} aria-hidden="true" />
           </button>
+          {showAccountMenu && (
+            <div className="workspace-account-menu" role="menu">
+              <div className="workspace-account-menu-identity"><strong>{member.display_name || member.email}</strong><span>{member.email}</span></div>
+              <button type="button" role="menuitem" onClick={() => void supabase.auth.signOut()}><LogOut size={16} aria-hidden="true" /> Sair do NXGEO</button>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -444,9 +518,22 @@ export default function Workspace() {
             <span className="sr-only">Buscar pasta ou mapa</span>
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar pasta ou mapa" />
           </label>
-          <button className="workspace-primary-button" type="button" onClick={() => openNewMapModal()} disabled={folders.length === 0}>
-            <Plus size={18} aria-hidden="true" /> Novo mapa
-          </button>
+          <div className="workspace-new-control">
+            <button className="workspace-primary-button" type="button" onClick={() => {
+              setShowNewMenu((current) => !current)
+              setShowAccountMenu(false)
+              setOpenFolderMenuId(null)
+              setOpenMapMenuId(null)
+            }} aria-expanded={showNewMenu} aria-haspopup="menu">
+              <Plus size={18} aria-hidden="true" /> Novo <ChevronDown size={15} aria-hidden="true" />
+            </button>
+            {showNewMenu && (
+              <div className="workspace-action-menu workspace-new-menu" role="menu">
+                {isAdmin && <button type="button" role="menuitem" onClick={() => { setShowNewMenu(false); setShowFolderModal(true) }}><Folder size={16} aria-hidden="true" /> Nova pasta</button>}
+                <button type="button" role="menuitem" onClick={() => openNewMapModal()} disabled={folders.length === 0}><MapIcon size={16} aria-hidden="true" /> Novo mapa</button>
+              </div>
+            )}
+          </div>
         </header>
 
         {(error || notice) && (
@@ -468,22 +555,17 @@ export default function Workspace() {
                     <ArrowLeft size={15} aria-hidden="true" /> Todas as pastas
                   </button>
                 )}
-                <span className="workspace-eyebrow">NXGEO</span>
                 <h1>{selectedFolder ? selectedFolder.name : `Olá, ${firstName(member.display_name, member.email)}`}</h1>
                 <p>{selectedFolder
                   ? (selectedFolder.description || 'Mapas e arquivos deste projeto estão reunidos aqui.')
                   : 'Seus projetos, mapas e imagens de trabalho estão organizados em um só lugar.'}</p>
               </div>
               <div className="workspace-hero-actions">
-                {isAdmin && !selectedFolder && (
-                  <button className="workspace-secondary-button" type="button" onClick={() => setShowFolderModal(true)}>
-                    <Folder size={18} aria-hidden="true" /> Nova pasta
-                  </button>
-                )}
                 {selectedFolder && (
-                  <button className="workspace-primary-button" type="button" onClick={() => openNewMapModal(selectedFolder.id)}>
-                    <Plus size={18} aria-hidden="true" /> Novo mapa
-                  </button>
+                  <div className="workspace-folder-toolbar">
+                    {isAdmin && <button className="workspace-secondary-button" type="button" onClick={() => setShareFolder(selectedFolder)}><Share2 size={17} aria-hidden="true" /> Compartilhar</button>}
+                    {isAdmin && <button className="workspace-icon-button danger" type="button" onClick={() => void handleArchiveFolder(selectedFolder)} disabled={busyAction === `archive-folder-${selectedFolder.id}`} aria-label={`Arquivar pasta ${selectedFolder.name}`} title="Arquivar pasta"><Archive size={17} aria-hidden="true" /></button>}
+                  </div>
                 )}
               </div>
             </div>
@@ -497,14 +579,32 @@ export default function Workspace() {
                 {visibleFolders.length > 0 ? (
                   <div className="folder-grid">
                     {visibleFolders.map((folder) => (
-                      <button className="folder-card" key={folder.id} type="button" onClick={() => setSelectedFolderId(folder.id)}>
-                        <div className="folder-icon"><Folder size={25} aria-hidden="true" /></div>
-                        <div>
-                          <strong>{folder.name}</strong>
-                          <span>{mapCountByFolder[folder.id] ?? 0} {(mapCountByFolder[folder.id] ?? 0) === 1 ? 'mapa' : 'mapas'}</span>
-                        </div>
-                        <ArrowLeft className="folder-arrow" size={18} aria-hidden="true" />
-                      </button>
+                      <article className="folder-card" key={folder.id}>
+                        <button className="folder-card-main" type="button" onClick={() => setSelectedFolderId(folder.id)}>
+                          <div className="folder-icon"><Folder size={25} aria-hidden="true" /></div>
+                          <div>
+                            <strong>{folder.name}</strong>
+                            <span>{mapCountByFolder[folder.id] ?? 0} {(mapCountByFolder[folder.id] ?? 0) === 1 ? 'mapa' : 'mapas'}</span>
+                          </div>
+                          <ChevronRight className="folder-arrow" size={18} aria-hidden="true" />
+                        </button>
+                        {isAdmin && (
+                          <div className="workspace-card-menu">
+                            <button className="workspace-icon-button" type="button" onClick={() => {
+                              setOpenFolderMenuId((current) => current === folder.id ? null : folder.id)
+                              setShowNewMenu(false)
+                              setShowAccountMenu(false)
+                              setOpenMapMenuId(null)
+                            }} aria-label={`Mais ações para ${folder.name}`} aria-expanded={openFolderMenuId === folder.id}><Ellipsis size={18} aria-hidden="true" /></button>
+                            {openFolderMenuId === folder.id && (
+                              <div className="workspace-action-menu" role="menu">
+                                <button type="button" role="menuitem" onClick={() => { setOpenFolderMenuId(null); setShareFolder(folder) }}><Share2 size={16} aria-hidden="true" /> Compartilhar pasta</button>
+                                <button className="danger-action" type="button" role="menuitem" onClick={() => void handleArchiveFolder(folder)} disabled={busyAction === `archive-folder-${folder.id}`}><Archive size={16} aria-hidden="true" /> Arquivar pasta</button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </article>
                     ))}
                   </div>
                 ) : (
@@ -547,9 +647,22 @@ export default function Workspace() {
                           <button className="workspace-icon-button" type="button" onClick={() => void handleQuickDownload(map)} disabled={!map.export_path || map.export_revision !== map.revision || busyAction === `download-${map.id}`} aria-label={`Baixar imagem de ${map.title}`} title={map.export_path && map.export_revision === map.revision ? 'Baixar imagem' : 'Abra e salve para preparar a imagem'}>
                             {busyAction === `download-${map.id}` ? <LoaderCircle className="workspace-spinner" size={17} /> : <Download size={17} />}
                           </button>
-                          <button className="workspace-icon-button danger" type="button" onClick={() => void handleArchiveMap(map)} disabled={busyAction === `archive-${map.id}`} aria-label={`Mover ${map.title} para a lixeira`} title="Mover para a lixeira">
-                            <Archive size={17} />
-                          </button>
+                          {(isAdmin || map.created_by === member.id) && (
+                            <div className="workspace-card-menu">
+                              <button className="workspace-icon-button" type="button" onClick={() => {
+                                setOpenMapMenuId((current) => current === map.id ? null : map.id)
+                                setShowNewMenu(false)
+                                setShowAccountMenu(false)
+                                setOpenFolderMenuId(null)
+                              }} aria-label={`Mais ações para ${map.title}`} aria-expanded={openMapMenuId === map.id}><Ellipsis size={18} aria-hidden="true" /></button>
+                              {openMapMenuId === map.id && (
+                                <div className="workspace-action-menu map-action-menu" role="menu">
+                                  {isAdmin && <button type="button" role="menuitem" onClick={() => { setMoveMapFolderId(map.folder_id); setMapToMove(map); setOpenMapMenuId(null) }}><FolderInput size={16} aria-hidden="true" /> Mover para pasta</button>}
+                                  <button className="danger-action" type="button" role="menuitem" onClick={() => void handleArchiveMap(map)} disabled={busyAction === `archive-${map.id}`}><Archive size={16} aria-hidden="true" /> Arquivar mapa</button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </article>
@@ -578,7 +691,7 @@ export default function Workspace() {
                 return (
                   <div className="person-row" key={target.email}>
                     <div className="person-identity">
-                      <div className="workspace-avatar">{firstName(target.display_name, target.email).slice(0, 1).toUpperCase()}</div>
+                      <div className="person-avatar"><CircleUserRound size={19} aria-hidden="true" /></div>
                       <div><strong>{target.display_name || target.email}</strong><span>{target.email}</span></div>
                     </div>
                     <label>
@@ -631,6 +744,36 @@ export default function Workspace() {
             <fieldset className="workspace-role-options"><legend>Tipo de acesso</legend><label><input type="radio" name="role" checked={invite.role === 'user'} onChange={() => setInvite((current) => ({ ...current, role: 'user' }))} /><span><strong>Usuário</strong><small>Trabalha apenas nas pastas compartilhadas.</small></span></label><label><input type="radio" name="role" checked={invite.role === 'admin'} onChange={() => setInvite((current) => ({ ...current, role: 'admin', folderIds: [] }))} /><span><strong>Administrador</strong><small>Vê todos os projetos e gerencia acessos.</small></span></label></fieldset>
             {invite.role === 'user' && <fieldset className="workspace-folder-checks"><legend>Pastas compartilhadas</legend>{folders.length ? folders.map((folder) => <label key={folder.id}><input type="checkbox" checked={invite.folderIds.includes(folder.id)} onChange={(event) => setInvite((current) => ({ ...current, folderIds: event.target.checked ? [...current.folderIds, folder.id] : current.folderIds.filter((id) => id !== folder.id) }))} /><span>{folder.name}</span></label>) : <p>Crie uma pasta antes de compartilhar projetos.</p>}</fieldset>}
             <div className="workspace-form-actions"><button className="workspace-secondary-button" type="button" onClick={() => setShowInviteModal(false)}>Cancelar</button><button className="workspace-primary-button" type="submit" disabled={busyAction === 'invite'}>{busyAction === 'invite' ? 'Enviando…' : 'Enviar convite'}</button></div>
+          </form>
+        </Modal>
+      )}
+
+      {shareFolder && (
+        <Modal title="Compartilhar pasta" description={`Quem receber “${shareFolder.name}” poderá abrir e trabalhar nos mapas desta pasta.`} onClose={() => { setShareFolder(null); setShareMemberId('') }}>
+          <form className="workspace-form" onSubmit={handleShareFolder}>
+            <label>Pessoa
+              <select value={shareMemberId} onChange={(event) => setShareMemberId(event.target.value)} required autoFocus>
+                <option value="">Escolha uma pessoa</option>
+                {members.filter((target) => target.role === 'user' && target.active).map((target) => (
+                  <option key={target.id} value={target.id}>{target.display_name || target.email}{target.folder_ids.includes(shareFolder.id) ? ' — já possui acesso' : ''}</option>
+                ))}
+              </select>
+              <span>Administradores já enxergam todos os projetos.</span>
+            </label>
+            <div className="workspace-form-actions"><button className="workspace-secondary-button" type="button" onClick={() => { setShareFolder(null); setShareMemberId('') }}>Cancelar</button><button className="workspace-primary-button" type="submit" disabled={!shareMemberId || busyAction === `share-folder-${shareFolder.id}`}>{busyAction === `share-folder-${shareFolder.id}` ? 'Compartilhando…' : 'Compartilhar'}</button></div>
+          </form>
+        </Modal>
+      )}
+
+      {mapToMove && (
+        <Modal title="Mover mapa" description={`Escolha a pasta que receberá “${mapToMove.title}”. A autoria e o histórico serão preservados.`} onClose={() => { setMapToMove(null); setMoveMapFolderId('') }}>
+          <form className="workspace-form" onSubmit={handleMoveMap}>
+            <label>Nova pasta
+              <select value={moveMapFolderId} onChange={(event) => setMoveMapFolderId(event.target.value)} required autoFocus>
+                {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
+              </select>
+            </label>
+            <div className="workspace-form-actions"><button className="workspace-secondary-button" type="button" onClick={() => { setMapToMove(null); setMoveMapFolderId('') }}>Cancelar</button><button className="workspace-primary-button" type="submit" disabled={!moveMapFolderId || moveMapFolderId === mapToMove.folder_id || busyAction === `move-map-${mapToMove.id}`}>{busyAction === `move-map-${mapToMove.id}` ? 'Movendo…' : 'Mover mapa'}</button></div>
           </form>
         </Modal>
       )}

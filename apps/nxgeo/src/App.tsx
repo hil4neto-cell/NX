@@ -12,6 +12,7 @@ import proj4 from 'proj4'
 import {
   ArrowLeft,
   BringToFront,
+  CircleUserRound,
   Crosshair,
   Download,
   Eye,
@@ -26,6 +27,7 @@ import {
   Save,
   Undo2,
   Upload,
+  X,
 } from 'lucide-react'
 import './App.css'
 import { supabase } from './supabase'
@@ -166,6 +168,7 @@ const EXPORT_WIDTH = 3840
 const EXPORT_HEIGHT = 2160
 const EXPORT_FOOTER_HEIGHT = 300
 const EXPORT_MAP_HEIGHT = EXPORT_HEIGHT - EXPORT_FOOTER_HEIGHT
+const EXPORT_FRAME_RATIO = EXPORT_WIDTH / EXPORT_MAP_HEIGHT
 const defaultCorners: FourCoordinates = [
   [-44.789215, -4.201319],
   [-44.786305, -4.2009],
@@ -222,7 +225,11 @@ function encodeSvg(svg: string) {
 
 function satelliteMaxZoom(satelliteVisible: boolean, variant: SatelliteVariant) {
   if (!satelliteVisible) return 20
-  return variant === 'clarity' ? 19 : 17
+  // A fonte Clarity deixa de entregar tiles confiáveis acima desse nível em
+  // partes do Brasil. Mantemos o teto real da fonte para não gerar áreas
+  // transparentes no editor ou na imagem final; a base Esri comum continua
+  // podendo usar mais detalhe quando disponível.
+  return variant === 'clarity' ? 17 : 20
 }
 
 function makeStyle(
@@ -249,7 +256,7 @@ function makeStyle(
           'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         ],
         tileSize: 256,
-        maxzoom: 17,
+        maxzoom: 20,
         attribution: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
       },
       esriClarity: {
@@ -258,13 +265,13 @@ function makeStyle(
           'https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         ],
         tileSize: 256,
-        maxzoom: 19,
+        maxzoom: 17,
         attribution: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
       },
       streetLabels: {
         type: 'raster',
-        tiles: ['https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png'],
-        tileSize: 256,
+        tiles: ['https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}@2x.png'],
+        tileSize: 512,
         maxzoom: 20,
         attribution: 'OpenStreetMap contributors, CARTO',
       },
@@ -1186,6 +1193,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
   const startingOverlayOptions = { ...defaultOverlayOptions, ...(initialProject?.overlayOptions ?? {}) }
   const mapRef = useRef<maplibregl.Map | null>(null)
   const mapNodeRef = useRef<HTMLDivElement | null>(null)
+  const exportFrameRef = useRef<HTMLDivElement | null>(null)
   const markersRef = useRef<Marker[]>([])
   const projectCreatedAtRef = useRef(initialProject?.createdAt ?? new Date().toISOString())
   const initialMapRef = useRef({
@@ -1217,7 +1225,9 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
     ? 'Mapa salvo aberto. Continue o trabalho ou prepare uma nova imagem.'
     : 'Comece importando PDNEZ/TXT, KML/KMZ, DXF ou carregando uma imagem da planta.')
   const [isExporting4k, setIsExporting4k] = useState(false)
+  const [isFramingExport, setIsFramingExport] = useState(false)
   const [isSavingWorkspace, setIsSavingWorkspace] = useState(false)
+  const [showEditorAccountMenu, setShowEditorAccountMenu] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [mapReady, setMapReady] = useState(false)
   const export4kLockRef = useRef(false)
@@ -1369,6 +1379,9 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
       center: initial.corners[0] as LngLatLike,
       zoom: 15.5,
       attributionControl: false,
+      dragRotate: false,
+      pitchWithRotate: false,
+      touchPitch: false,
     })
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right')
@@ -1792,7 +1805,29 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
   }
 
 
-  async function renderImage4k() {
+  function getExportFrameBounds(): [Coordinate, Coordinate] | null {
+    const sourceMap = mapRef.current
+    const frame = exportFrameRef.current
+    if (!sourceMap || !frame) return null
+
+    const mapRect = sourceMap.getContainer().getBoundingClientRect()
+    const frameRect = frame.getBoundingClientRect()
+    const northWest = sourceMap.unproject([
+      frameRect.left - mapRect.left,
+      frameRect.top - mapRect.top,
+    ])
+    const southEast = sourceMap.unproject([
+      frameRect.right - mapRect.left,
+      frameRect.bottom - mapRect.top,
+    ])
+
+    return [
+      [northWest.lng, southEast.lat],
+      [southEast.lng, northWest.lat],
+    ]
+  }
+
+  async function renderImage4k(selectedBounds?: [Coordinate, Coordinate]) {
     const sourceMap = mapRef.current
     const visibleBounds = sourceMap?.getBounds()
     const currentBounds = visibleBounds
@@ -1937,8 +1972,11 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
         ...(hasControlGeometry ? corners : []),
         ...collectImportedCoordinates(importedGeometries),
       ]
-      const [sw, ne] = currentBounds ?? getBounds(exportCoordinates.length ? exportCoordinates : corners)
-      exportMap.fitBounds([sw, ne], { padding: 0, maxZoom: satelliteMaxZoom(satellite, satelliteVariant), duration: 0 })
+      const [sw, ne] = selectedBounds ?? currentBounds ?? getBounds(exportCoordinates.length ? exportCoordinates : corners)
+      // selectedBounds vem da moldura de exportação, cuja proporção é igual à
+      // área útil do PNG. Assim o arquivo final representa exatamente o recorte
+      // que a pessoa confirmou, sem reenquadrar o projeto inteiro.
+      exportMap.fitBounds([sw, ne], { padding: 0, duration: 0 })
       await waitForMapIdle(exportMap)
 
       const mapCanvas = exportMap.getCanvas()
@@ -1968,16 +2006,62 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
     }
   }
 
+  function startImageExport() {
+    if (!mapReady) {
+      setStatus('Aguarde o mapa terminar de carregar antes de definir a área da imagem.')
+      return
+    }
+    setIsFramingExport(true)
+    setStatus('Defina a área da imagem: arraste e aproxime o mapa até o conteúdo desejado ficar dentro da moldura.')
+  }
+
   async function exportImage4k() {
     if (export4kLockRef.current) return
+    const selectedBounds = getExportFrameBounds()
+    if (!selectedBounds) {
+      setStatus('Não consegui ler a área selecionada. Tente abrir novamente a definição da imagem.')
+      return
+    }
+
     export4kLockRef.current = true
     setIsExporting4k(true)
-    setStatus('Renderizando mapa 4K com as coordenadas atuais. Isso pode levar alguns segundos.')
+    setIsFramingExport(false)
+    const savingVersion = changeVersionRef.current
 
     try {
-      const { png, fileName } = await renderImage4k()
+      let revision: number | null = null
+      if (onSaveProject) {
+        setStatus('Salvando o recorte e gerando a imagem 4K. Isso pode levar alguns segundos.')
+        revision = await onSaveProject({
+          ...project,
+          schemaVersion: 2,
+          createdAt: projectCreatedAtRef.current,
+          updatedAt: new Date().toISOString(),
+          viewport: { bounds: selectedBounds },
+        })
+        if (changeVersionRef.current === savingVersion) {
+          setHasUnsavedChanges(false)
+        }
+      } else {
+        setStatus('Gerando a imagem 4K da área selecionada. Isso pode levar alguns segundos.')
+      }
+
+      const { png, fileName } = await renderImage4k(selectedBounds)
       downloadBlob(fileName, png)
-      setStatus(`PNG 4K exportado com a area visivel atual do mapa: ${fileName}.`)
+
+      if (revision !== null && onSaveExport && changeVersionRef.current === savingVersion) {
+        try {
+          await onSaveExport(png, revision)
+          setStatus(`PNG 4K exportado e imagem rápida atualizada no painel: ${fileName}.`)
+        } catch (exportError) {
+          const reason = exportError instanceof Error ? exportError.message : 'não foi possível atualizar a imagem rápida'
+          setStatus(`PNG 4K exportado: ${fileName}. O mapa foi salvo, mas ${reason}.`)
+        }
+      } else if (revision !== null) {
+        setStatus(`PNG 4K exportado: ${fileName}. Há alterações mais recentes; salve e exporte novamente para atualizar a imagem rápida.`)
+      } else {
+        setStatus(`PNG 4K exportado com o recorte confirmado: ${fileName}.`)
+      }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Nao consegui exportar a imagem 4K.')
     } finally {
@@ -2011,24 +2095,11 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
         viewport,
       })
       if (changeVersionRef.current !== savingVersion) {
-        setStatus('Mapa salvo. Existem alteracoes mais recentes; salve novamente para atualizar a imagem rapida.')
+        setStatus('Mapa salvo. Existem alterações mais recentes; salve novamente antes de exportar a imagem.')
         return
       }
       setHasUnsavedChanges(false)
-      setStatus('Mapa salvo. Preparando a imagem rápida para o painel…')
-
-      if (onSaveExport) {
-        try {
-          const { png } = await renderImage4k()
-          await onSaveExport(png, revision)
-          setStatus('Mapa salvo. A imagem rápida também está pronta no painel.')
-        } catch (exportError) {
-          const reason = exportError instanceof Error ? exportError.message : 'nao foi possivel gerar a imagem'
-          setStatus(`Mapa salvo com seguranca. A imagem rapida nao foi atualizada: ${reason}`)
-        }
-      } else {
-        setStatus('Mapa salvo no painel.')
-      }
+      setStatus(`Mapa salvo no painel (revisão ${revision}). Use Exportar imagem para confirmar o recorte e atualizar a imagem rápida.`)
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Nao consegui salvar o mapa no painel.')
     } finally {
@@ -2125,7 +2196,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
       <aside className="tool-panel" aria-label="Controles de georreferenciamento">
         <header className="brand">
           {onBack && (
-            <button className="editor-back" type="button" onClick={returnToWorkspace} disabled={isSavingWorkspace} title="Voltar aos projetos" aria-label="Voltar aos projetos">
+            <button className="editor-back" type="button" onClick={returnToWorkspace} disabled={isSavingWorkspace || isExporting4k} title="Voltar aos projetos" aria-label="Voltar aos projetos">
               <ArrowLeft size={17} aria-hidden="true" />
             </button>
           )}
@@ -2141,10 +2212,12 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
                 <span>{isSavingWorkspace ? 'Salvando' : 'Salvar'}</span>
               </button>
             )}
-            <button className="brand-signout" type="button" onClick={() => void supabase.auth.signOut()} title="Sair do NXGEO">
-              <LogOut size={16} aria-hidden="true" />
-              <span>Sair</span>
-            </button>
+            <div className="editor-account-control">
+              <button className="editor-account-trigger" type="button" onClick={() => setShowEditorAccountMenu((current) => !current)} aria-label="Abrir menu da conta" aria-expanded={showEditorAccountMenu} aria-haspopup="menu">
+                <CircleUserRound size={17} aria-hidden="true" />
+              </button>
+              {showEditorAccountMenu && <div className="editor-account-menu" role="menu"><button type="button" role="menuitem" onClick={() => void supabase.auth.signOut()}><LogOut size={16} aria-hidden="true" /> Sair do NXGEO</button></div>}
+            </div>
           </div>
         </header>
 
@@ -2291,7 +2364,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
             <button onClick={exportGeoJson}><Download size={16} /> GeoJSON</button>
             <button onClick={exportKml}><Download size={16} /> KML</button>
             <button onClick={exportKmz}><Download size={16} /> KMZ</button>
-            <button onClick={exportImage4k} disabled={isExporting4k}><Download size={16} /> {isExporting4k ? 'Gerando 4K' : 'PNG 4K'}</button>
+            <button onClick={startImageExport} disabled={isExporting4k || isFramingExport}><Download size={16} /> {isExporting4k ? 'Gerando 4K' : isFramingExport ? 'Definindo área' : 'Exportar imagem'}</button>
           </div>
         </section>
 
@@ -2365,9 +2438,25 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
 
       <section className="map-stage" aria-label="Mapa">
         <div className="map-toolbar">
-          <span>Ajuste os pontos de controle para alinhar planta, area e base cartografica</span>
+          <span>{isFramingExport ? 'Ajuste o mapa por trás da moldura para definir a imagem final' : 'Ajuste os pontos de controle para alinhar planta, area e base cartografica'}</span>
         </div>
         <div ref={mapNodeRef} className="map" />
+        {isFramingExport && (
+          <>
+            <div className="export-frame-mask" aria-hidden="true">
+              <div ref={exportFrameRef} className="export-frame" style={{ aspectRatio: EXPORT_FRAME_RATIO }}>
+                <span>Área da imagem 4K</span>
+              </div>
+            </div>
+            <div className="export-framing-panel" role="status">
+              <div><strong>Definir área da imagem</strong><span>Arraste ou aproxime o mapa até a área desejada ficar dentro da moldura.{hasWorkspaceSave ? ' A imagem também ficará pronta para baixar no painel.' : ''}</span></div>
+              <div className="export-framing-actions">
+                <button type="button" onClick={() => { setIsFramingExport(false); setStatus('Exportação cancelada. O mapa não foi alterado.') }} disabled={isExporting4k}><X size={16} aria-hidden="true" /> Cancelar</button>
+                <button type="button" onClick={() => void exportImage4k()} disabled={isExporting4k}><Download size={16} aria-hidden="true" /> {isExporting4k ? 'Gerando…' : 'Gerar PNG 4K'}</button>
+              </div>
+            </div>
+          </>
+        )}
       </section>
     </main>
   )
