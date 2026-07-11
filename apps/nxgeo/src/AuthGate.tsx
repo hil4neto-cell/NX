@@ -119,7 +119,7 @@ export default function AuthGate({ children }: AuthGateProps) {
   async function verifyAccessCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const token = code.replace(/\D/g, '')
-    if (token.length !== 6 || !pendingEmail) return
+    if (token.length !== 8 || !pendingEmail) return
 
     setIsVerifying(true)
     setIsError(false)
@@ -135,7 +135,7 @@ export default function AuthGate({ children }: AuthGateProps) {
       setMessage('Código confirmado. Abrindo seu espaço de trabalho…')
     } catch {
       setIsError(true)
-      setMessage('Código inválido ou expirado. Confira os seis dígitos ou peça um novo código.')
+      setMessage('Código inválido ou expirado. Confira os oito dígitos ou peça um novo código.')
     } finally {
       setIsVerifying(false)
     }
@@ -256,23 +256,23 @@ export default function AuthGate({ children }: AuthGateProps) {
           ) : (
             <form className="auth-form auth-code-form" onSubmit={verifyAccessCode}>
               <p className="auth-code-sent">Código enviado para <strong>{pendingEmail}</strong></p>
-              <label htmlFor="auth-code">Já recebeu o código? Digite os 6 números</label>
+              <label htmlFor="auth-code">Já recebeu o código? Digite os 8 números</label>
               <input
                 id="auth-code"
                 className="auth-code-input"
                 type="text"
                 value={code}
-                onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 8))}
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 enterKeyHint="done"
-                maxLength={6}
+                maxLength={8}
                 pattern="[0-9]*"
-                placeholder="000000"
+                placeholder="00000000"
                 autoFocus
                 required
               />
-              <button type="submit" disabled={isVerifying || code.length !== 6}>
+              <button type="submit" disabled={isVerifying || code.length !== 8}>
                 {isVerifying ? <LoaderCircle className="auth-spinner" size={18} aria-hidden="true" /> : <ShieldCheck size={18} aria-hidden="true" />}
                 {isVerifying ? 'Confirmando…' : 'Entrar no NXGEO'}
               </button>

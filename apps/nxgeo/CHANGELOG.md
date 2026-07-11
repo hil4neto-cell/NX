@@ -11,7 +11,7 @@ Registro manual de mudancas importantes. Data base: 2026-07-09.
 
 ## 2026-07-11 - Login por código dentro do aplicativo
 
-- O acesso passou a usar um código único de seis dígitos enviado ao e-mail autorizado.
+- O acesso passou a usar um código único de oito dígitos enviado ao e-mail autorizado.
 - A confirmação acontece na própria tela do NXGEO, sem depender de abrir o link no navegador padrão do celular ou computador.
 - Adicionados reenvio temporizado do código, troca de e-mail e suporte ao preenchimento automático de código único em dispositivos compatíveis.
 - Convites enviados por administradores passaram a entregar o mesmo código de acesso; a pessoa não precisa criar senha.

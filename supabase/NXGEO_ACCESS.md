@@ -1,6 +1,6 @@
 # NXGEO: acesso, equipe e workspace
 
-O NXGEO usa o Supabase Auth para login sem senha por código único de seis dígitos e o Postgres para decidir, em tempo real, quais dados cada pessoa pode acessar.
+O NXGEO usa o Supabase Auth para login sem senha por código único de oito dígitos e o Postgres para decidir, em tempo real, quais dados cada pessoa pode acessar.
 
 Papéis:
 
@@ -37,7 +37,7 @@ Em **Authentication > URL Configuration**:
 Em **Authentication > Emails > Templates > Magic Link**:
 
 - assunto sugerido: `Seu código de acesso ao NXGEO` (não coloque o código no assunto);
-- no corpo, use `{{ .Token }}` para exibir o código de seis dígitos;
+- no corpo, use `{{ .Token }}` para exibir o código de oito dígitos;
 - **não** use `{{ .ConfirmationURL }}` nesse template, pois ela cria um link que abre no navegador padrão;
 - mantenha o prazo padrão de expiração do código, salvo uma decisão de segurança posterior.
 
@@ -79,7 +79,7 @@ A função aplica quatro verificações:
 3. chama `nxgeo_admin_invite_member` com a sessão do usuário, portanto a RLS/RPC confirma que ele é admin;
 4. solicita ao Supabase um código único somente depois da autorização estar gravada.
 
-Para uma pessoa nova ou já existente, a função envia o mesmo código de seis dígitos. Se o envio falhar, a autorização permanece pendente e a interface pode oferecer **Reenviar convite**.
+Para uma pessoa nova ou já existente, a função envia o mesmo código de oito dígitos. Se o envio falhar, a autorização permanece pendente e a interface pode oferecer **Reenviar convite**.
 
 Exemplo no frontend:
 
