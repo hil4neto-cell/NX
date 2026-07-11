@@ -10,6 +10,7 @@ import {
   Map,
   ShieldCheck,
 } from 'lucide-react'
+import PwaInstall from './PwaInstall'
 import { supabase } from './supabase'
 import './AuthGate.css'
 
@@ -161,6 +162,8 @@ export default function AuthGate({ children }: AuthGateProps) {
             <li><Map size={19} aria-hidden="true" /><span>Mapas sempre à mão</span></li>
             <li><Download size={19} aria-hidden="true" /><span>Exportação rápida</span></li>
           </ul>
+
+          <PwaInstall variant="auth" />
         </section>
 
         <section className="auth-card auth-login-card" aria-labelledby="auth-title">

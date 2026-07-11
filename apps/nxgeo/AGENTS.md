@@ -65,6 +65,7 @@ O usuario final nao deve ver uma marcacao laranja agressiva como primeira leitur
 - Mapas, miniaturas e exports ficam no bucket privado `nxgeo-workspace`, protegidos pela permissao da pasta.
 - Alteracoes de equipe, pastas e mapas geram auditoria; exclusoes usam soft delete.
 - Sessao persistente no navegador e botao de saida no painel.
+- NXGEO pode ser instalado como PWA: Chrome usa o botao Instalar aplicativo e iPhone recebe instrucao para Adicionar a Tela de Inicio no Safari.
 - Upload de planta PNG/JPG/SVG como imagem raster sobre o mapa.
 - Entrada manual de quatro pontos em UTM ou Lat/Lon.
 - Conversao UTM para WGS84 via proj4.
