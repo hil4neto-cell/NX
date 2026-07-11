@@ -258,7 +258,7 @@ function makeStyle(
   const labelPaint = {
     'text-color': '#ffffff',
     'text-halo-color': isExport ? '#020617' : '#07111f',
-    'text-halo-width': isExport ? 1.5 : 1.15,
+    'text-halo-width': isExport ? 2.25 : 1.15,
     'text-halo-blur': isExport ? 0.2 : 0.1,
   } as const
 
@@ -319,9 +319,14 @@ function makeStyle(
           'symbol-placement': 'line',
           'text-field': ['coalesce', ['get', 'name'], ['get', 'name_en'], ''],
           'text-font': ['Noto Sans Regular'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 17, 11],
+          // O PNG tem 3840 px de largura e normalmente é visto reduzido. A
+          // escala 2x preserva a leitura que a pessoa tem no editor sem deixar
+          // os rótulos gigantes enquanto trabalha no mapa.
+          'text-size': isExport
+            ? ['interpolate', ['linear'], ['zoom'], 12, 20, 17, 22]
+            : ['interpolate', ['linear'], ['zoom'], 12, 10, 17, 11],
           'text-max-angle': 30,
-          'text-padding': 3,
+          'text-padding': isExport ? 5 : 3,
         },
         paint: labelPaint,
       },
@@ -337,9 +342,11 @@ function makeStyle(
           'symbol-placement': 'line',
           'text-field': ['coalesce', ['get', 'name'], ['get', 'name_en'], ''],
           'text-font': ['Noto Sans Regular'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 15, 10, 18, 11],
+          'text-size': isExport
+            ? ['interpolate', ['linear'], ['zoom'], 15, 18, 18, 21]
+            : ['interpolate', ['linear'], ['zoom'], 15, 10, 18, 11],
           'text-max-angle': 30,
-          'text-padding': 3,
+          'text-padding': isExport ? 5 : 3,
         },
         paint: labelPaint,
       },
