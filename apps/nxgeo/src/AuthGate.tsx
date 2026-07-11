@@ -19,13 +19,19 @@ type AuthGateProps = {
 }
 
 type AccessState = 'idle' | 'checking' | 'allowed' | 'denied' | 'error'
+type LoginStep = 'email' | 'code'
 
 export default function AuthGate({ children }: AuthGateProps) {
   const [session, setSession] = useState<Session | null>(null)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [accessState, setAccessState] = useState<AccessState>('idle')
   const [email, setEmail] = useState('')
+  const [pendingEmail, setPendingEmail] = useState('')
+  const [loginStep, setLoginStep] = useState<LoginStep>('email')
+  const [code, setCode] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [resendIn, setResendIn] = useState(0)
   const [message, setMessage] = useState('')
   const [isError, setIsError] = useState(false)
 
@@ -68,30 +74,80 @@ export default function AuthGate({ children }: AuthGateProps) {
     }
   }, [accessState, session])
 
-  async function requestMagicLink(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const timeout = window.setTimeout(() => {
+      setResendIn((current) => Math.max(0, current - 1))
+    }, 1_000)
+    return () => window.clearTimeout(timeout)
+  }, [resendIn])
+
+  async function sendAccessCode(normalizedEmail: string) {
     setIsSending(true)
     setIsError(false)
     setMessage('')
 
-    const normalizedEmail = email.trim().toLowerCase()
-    const redirectPath = import.meta.env.BASE_URL.replace(/\/$/, '')
     try {
-      await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithOtp({
         email: normalizedEmail,
         options: {
-          emailRedirectTo: `${window.location.origin}${redirectPath}`,
           shouldCreateUser: true,
         },
       })
+      if (error) throw error
 
-      setMessage('Se este e-mail estiver autorizado, enviaremos um link de acesso. Verifique também o spam.')
+      setPendingEmail(normalizedEmail)
+      setLoginStep('code')
+      setCode('')
+      setResendIn(60)
+      setMessage('Se este e-mail estiver autorizado, enviamos um código de acesso. Verifique também o spam.')
     } catch {
       setIsError(true)
-      setMessage('Não foi possível contatar o serviço de acesso. Tente novamente em instantes.')
+      setMessage('Não foi possível enviar o código. Confira o e-mail ou tente novamente em instantes.')
     } finally {
       setIsSending(false)
     }
+  }
+
+  async function requestAccessCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail) return
+    await sendAccessCode(normalizedEmail)
+  }
+
+  async function verifyAccessCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const token = code.replace(/\D/g, '')
+    if (token.length !== 6 || !pendingEmail) return
+
+    setIsVerifying(true)
+    setIsError(false)
+    setMessage('')
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: pendingEmail,
+        token,
+        type: 'email',
+      })
+      if (error) throw error
+
+      setMessage('Código confirmado. Abrindo seu espaço de trabalho…')
+    } catch {
+      setIsError(true)
+      setMessage('Código inválido ou expirado. Confira os seis dígitos ou peça um novo código.')
+    } finally {
+      setIsVerifying(false)
+    }
+  }
+
+  function useAnotherEmail() {
+    setLoginStep('email')
+    setPendingEmail('')
+    setCode('')
+    setResendIn(0)
+    setIsError(false)
+    setMessage('')
   }
 
   if (isCheckingSession || (session && accessState === 'checking')) {
@@ -175,33 +231,67 @@ export default function AuthGate({ children }: AuthGateProps) {
           <h2 id="auth-title">Bem-vindo ao NXGEO</h2>
           <p>Use o e-mail autorizado para acessar seu espaço de trabalho.</p>
 
-          <form className="auth-form" onSubmit={requestMagicLink}>
-            <label htmlFor="auth-email">E-mail de acesso</label>
-            <div className="auth-input">
-              <Mail size={18} aria-hidden="true" />
+          {loginStep === 'email' ? (
+            <form className="auth-form" onSubmit={requestAccessCode}>
+              <label htmlFor="auth-email">E-mail de acesso</label>
+              <div className="auth-input">
+                <Mail size={18} aria-hidden="true" />
+                <input
+                  id="auth-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder="nome@empresa.com"
+                  required
+                />
+              </div>
+              <button type="submit" disabled={isSending}>
+                {isSending ? <LoaderCircle className="auth-spinner" size={18} aria-hidden="true" /> : <Mail size={18} aria-hidden="true" />}
+                {isSending ? 'Enviando…' : 'Receber código de acesso'}
+              </button>
+            </form>
+          ) : (
+            <form className="auth-form auth-code-form" onSubmit={verifyAccessCode}>
+              <p className="auth-code-sent">Código enviado para <strong>{pendingEmail}</strong></p>
+              <label htmlFor="auth-code">Já recebeu o código? Digite os 6 números</label>
               <input
-                id="auth-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
-                autoCapitalize="none"
-                spellCheck={false}
-                placeholder="nome@empresa.com"
+                id="auth-code"
+                className="auth-code-input"
+                type="text"
+                value={code}
+                onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                enterKeyHint="done"
+                maxLength={6}
+                pattern="[0-9]*"
+                placeholder="000000"
+                autoFocus
                 required
               />
-            </div>
-            <button type="submit" disabled={isSending}>
-              {isSending ? <LoaderCircle className="auth-spinner" size={18} aria-hidden="true" /> : <Mail size={18} aria-hidden="true" />}
-              {isSending ? 'Enviando…' : 'Receber link de acesso'}
-            </button>
-          </form>
+              <button type="submit" disabled={isVerifying || code.length !== 6}>
+                {isVerifying ? <LoaderCircle className="auth-spinner" size={18} aria-hidden="true" /> : <ShieldCheck size={18} aria-hidden="true" />}
+                {isVerifying ? 'Confirmando…' : 'Entrar no NXGEO'}
+              </button>
+              <div className="auth-code-actions">
+                <button className="auth-text-action" type="button" onClick={() => void sendAccessCode(pendingEmail)} disabled={isSending || resendIn > 0}>
+                  {isSending ? 'Enviando…' : resendIn > 0 ? `Reenviar em ${resendIn}s` : 'Enviar novo código'}
+                </button>
+                <button className="auth-text-action" type="button" onClick={useAnotherEmail}>Usar outro e-mail</button>
+              </div>
+            </form>
+          )}
 
           {message && <p className={isError ? 'auth-message error' : 'auth-message'} role="status">{message}</p>}
 
           <div className="auth-helper">
             <LockKeyhole size={15} aria-hidden="true" />
-            <small>Enviaremos um link seguro. Você não precisa criar senha.</small>
+            <small>{loginStep === 'email'
+              ? 'Você receberá um código único. Não é necessário criar senha.'
+              : 'O código pode ser usado uma única vez. Depois, este dispositivo permanece conectado.'}</small>
           </div>
         </section>
       </div>

@@ -9,9 +9,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-    // Convites sao abertos em outro navegador; o fluxo implicito e o formato
-    // compativel com os links enviados pelo Auth Admin do Supabase.
-    flowType: 'implicit',
+    detectSessionInUrl: false,
+    // O código é confirmado no próprio app; a sessão permanece neste dispositivo.
   },
 })

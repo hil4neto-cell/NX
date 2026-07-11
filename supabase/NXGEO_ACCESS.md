@@ -1,6 +1,6 @@
 # NXGEO: acesso, equipe e workspace
 
-O NXGEO usa o Supabase Auth para login sem senha e o Postgres para decidir, em tempo real, quais dados cada pessoa pode acessar.
+O NXGEO usa o Supabase Auth para login sem senha por código único de seis dígitos e o Postgres para decidir, em tempo real, quais dados cada pessoa pode acessar.
 
 Papéis:
 
@@ -34,6 +34,15 @@ Em **Authentication > URL Configuration**:
 - Site URL: `https://nxprojetos.com/nxgeo`;
 - Redirect URL permitida: `https://nxprojetos.com/nxgeo`.
 
+Em **Authentication > Emails > Templates > Magic Link**:
+
+- assunto sugerido: `Seu código de acesso ao NXGEO` (não coloque o código no assunto);
+- no corpo, use `{{ .Token }}` para exibir o código de seis dígitos;
+- **não** use `{{ .ConfirmationURL }}` nesse template, pois ela cria um link que abre no navegador padrão;
+- mantenha o prazo padrão de expiração do código, salvo uma decisão de segurança posterior.
+
+O app confirma esse código na própria tela. Não há senha inicial para criar: é mais simples para a pessoa convidada e a sessão continua no dispositivo depois da primeira confirmação.
+
 Em **Authentication > Auth Hooks > Before User Created**:
 
 1. selecione **Postgres Function**;
@@ -50,8 +59,7 @@ Configure somente valores não sensíveis pelo CLI:
 
 ```bash
 supabase secrets set \
-  NXGEO_ALLOWED_ORIGINS="https://nxprojetos.com,http://localhost:5173" \
-  NXGEO_REDIRECT_URL="https://nxprojetos.com/nxgeo"
+  NXGEO_ALLOWED_ORIGINS="https://nxprojetos.com,http://localhost:5173"
 ```
 
 Depois publique:
@@ -60,18 +68,18 @@ Depois publique:
 supabase functions deploy nxgeo-invite
 ```
 
-O ambiente hospedado do Supabase fornece automaticamente `SUPABASE_URL`, os dicionários `SUPABASE_PUBLISHABLE_KEYS` e `SUPABASE_SECRET_KEYS` e, durante a transição, as chaves legadas. A função entende os dois formatos. Não é necessário copiar a chave secreta para o código ou para o frontend.
+O ambiente hospedado do Supabase fornece automaticamente `SUPABASE_URL` e o dicionário `SUPABASE_PUBLISHABLE_KEYS`. Não é necessário copiar chave secreta para o código ou para o frontend; esta função não usa chave administrativa.
 
-Para execução local, use um arquivo `.env.local` ignorado pelo Git e passe-o com `supabase functions serve --env-file .env.local`. Nunca grave ou envie a chave secreta no React, no Git ou no corpo da requisição.
+Para execução local, use um arquivo `.env.local` ignorado pelo Git e passe-o com `supabase functions serve --env-file .env.local`. Nunca grave segredo no React, no Git ou no corpo da requisição.
 
 A função aplica quatro verificações:
 
 1. aceita somente origens configuradas;
 2. valida a sessão pelo Supabase Auth;
 3. chama `nxgeo_admin_invite_member` com a sessão do usuário, portanto a RLS/RPC confirma que ele é admin;
-4. usa a chave administrativa somente no servidor para enviar o convite.
+4. solicita ao Supabase um código único somente depois da autorização estar gravada.
 
-Para um usuário Auth já existente, a função reenvia um magic link. Para uma pessoa nova, envia o convite oficial do Supabase. Se o envio falhar, a autorização permanece pendente e a interface pode oferecer **Reenviar convite**.
+Para uma pessoa nova ou já existente, a função envia o mesmo código de seis dígitos. Se o envio falhar, a autorização permanece pendente e a interface pode oferecer **Reenviar convite**.
 
 Exemplo no frontend:
 

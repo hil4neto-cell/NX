@@ -298,7 +298,7 @@ export default function Workspace() {
       setMembers(await listMembers())
       setInvite(emptyInvite)
       setShowInviteModal(false)
-      setNotice('Convite enviado. A pessoa receberá um link seguro por e-mail.')
+      setNotice('Convite enviado. A pessoa receberá um código de acesso por e-mail.')
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Não foi possível enviar o convite.')
     } finally {
@@ -624,7 +624,7 @@ export default function Workspace() {
       )}
 
       {showInviteModal && (
-        <Modal title="Convidar pessoa" description="Ela receberá um link seguro e não precisará criar senha." onClose={() => setShowInviteModal(false)}>
+        <Modal title="Convidar pessoa" description="Ela receberá um código de acesso por e-mail e não precisará criar senha." onClose={() => setShowInviteModal(false)}>
           <form className="workspace-form" onSubmit={handleInvite}>
             <label>Nome<input value={invite.displayName} onChange={(event) => setInvite((current) => ({ ...current, displayName: event.target.value }))} placeholder="Nome da pessoa" autoFocus required /></label>
             <label>E-mail<input type="email" value={invite.email} onChange={(event) => setInvite((current) => ({ ...current, email: event.target.value }))} placeholder="pessoa@empresa.com" required /></label>

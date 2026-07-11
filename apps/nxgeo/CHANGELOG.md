@@ -9,6 +9,13 @@ Registro manual de mudancas importantes. Data base: 2026-07-09.
 - iPhone recebe uma orientação direta para Safari > Compartilhar > Adicionar à Tela de Início.
 - Adicionado cache somente da estrutura pública do app para abertura resiliente, sem guardar mapas, sessões ou arquivos privados do cliente.
 
+## 2026-07-11 - Login por código dentro do aplicativo
+
+- O acesso passou a usar um código único de seis dígitos enviado ao e-mail autorizado.
+- A confirmação acontece na própria tela do NXGEO, sem depender de abrir o link no navegador padrão do celular ou computador.
+- Adicionados reenvio temporizado do código, troca de e-mail e suporte ao preenchimento automático de código único em dispositivos compatíveis.
+- Convites enviados por administradores passaram a entregar o mesmo código de acesso; a pessoa não precisa criar senha.
+
 ## 2026-07-11 - Workspace de projetos e equipe
 
 - Adicionado painel receptivo com saudacao, busca, pastas e mapas recentes.
@@ -31,7 +38,7 @@ Registro manual de mudancas importantes. Data base: 2026-07-09.
 
 ## 2026-07-11 - Autenticacao com Supabase
 
-- Adicionada tela de acesso restrito por link magico enviado ao e-mail.
+- Adicionada tela de acesso restrito por código único enviado ao e-mail.
 - Adicionada allowlist SQL para autorizar, bloquear e reativar e-mails sem usar o painel de usuarios.
 - Adicionado Auth Hook do Supabase para impedir no servidor o cadastro de e-mails fora da allowlist.
 - A permissao e verificada novamente depois da autenticacao.
