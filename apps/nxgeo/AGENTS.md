@@ -10,7 +10,7 @@ Este arquivo e para qualquer proxima sessao entender o projeto sem depender do h
 - Package name: nxgeo.
 - Stack: React + TypeScript + Vite + MapLibre GL + proj4 + JSZip + oxlint.
 - App principal: src/App.tsx. Hoje quase toda a regra esta nesse arquivo.
-- Nao ha repositorio Git inicializado nesta pasta nesta data. Confira antes de assumir historico.
+- O repositório Git remoto é `marcelotopografia/NX`. Antes de publicar, confira a branch, o diff e se já existe uma PR relacionada.
 
 ## Como rodar
 
@@ -43,13 +43,13 @@ O usuario final nao deve ver uma marcacao laranja agressiva como primeira leitur
 - Carregar imagem foi clarificado como Planta PNG/JPG.
 - Importar estudo virou Abrir NXGEO, porque abre JSON interno salvo pelo proprio app.
 - Exportar estudo virou Salvar NXGEO.
-- Exportacao 4K deve baixar apenas um arquivo PNG, com um clique.
+- Exportacao 4K deve baixar apenas um arquivo PNG, depois de a pessoa confirmar o recorte em uma moldura com a mesma proporção da área útil do arquivo.
 - Nome do PNG 4K deve seguir `NX-DD.MM.AAAA-NOMEDOPROJETO.png`.
 - Exportacao 4K nao deve baixar PGW, PRJ, JSON auxiliar, prancha ou qualquer outro arquivo junto.
 - O PNG 4K deve respeitar os filtros atuais do mapa.
 - O PNG 4K deve incluir rodape desenhado dentro da imagem final, com marca NX Projetos/NXGEO e dados da prancha.
 - O rodape do PNG 4K deve manter visivel a atribuicao da base cartografica e dos rotulos utilizados.
-- O PNG 4K deve exportar a area visivel atual do mapa, nao reenquadrar automaticamente o projeto inteiro.
+- O PNG 4K deve respeitar o recorte confirmado na moldura, sem reenquadrar automaticamente o projeto inteiro.
 - A marca NX no rodape 4K deve usar o SVG real (`public/nx-white.svg`), nao texto "NX" desenhado manualmente.
 - O usuario precisa conseguir escolher Mapa, Satelite ou Clarity.
 - O usuario precisa conseguir ligar/desligar Nomes de ruas sobre o satelite, estilo Google Earth.
@@ -63,8 +63,8 @@ O usuario final nao deve ver uma marcacao laranja agressiva como primeira leitur
 - Papeis de produto: `admin` gerencia equipe e todas as pastas; `user` trabalha somente nas pastas atribuidas.
 - Painel com saudacao, pastas, mapas recentes, miniaturas e download rapido do ultimo PNG salvo.
 - Mapas, miniaturas e exports ficam no bucket privado `nxgeo-workspace`, protegidos pela permissao da pasta.
-- Alteracoes de equipe, pastas e mapas geram auditoria; exclusoes usam soft delete.
-- Sessao persistente no navegador e botao de saida no painel.
+- Alteracoes de equipe, pastas e mapas geram auditoria; arquivamentos usam soft delete e preservam os arquivos para uma restauração futura.
+- Sessão persistente no navegador; saída fica dentro do menu de conta, sem poluir a área de trabalho.
 - NXGEO pode ser instalado como PWA: Chrome usa o botao Instalar aplicativo e iPhone recebe instrucao para Adicionar a Tela de Inicio no Safari.
 - Upload de planta PNG/JPG/SVG como imagem raster sobre o mapa.
 - Entrada manual de quatro pontos em UTM ou Lat/Lon.
@@ -79,7 +79,7 @@ O usuario final nao deve ver uma marcacao laranja agressiva como primeira leitur
 - Importacao DXF.
 - Exportacao NXGEO JSON.
 - Exportacao GeoJSON, KML e KMZ.
-- Exportacao PNG 4K.
+- Exportacao PNG 4K com definição visual de área antes de gerar o arquivo.
 - Filtros visuais de projeto, pontos, rotulos e controle.
 - Desfazer, limpar, centralizar e demo.
 
@@ -116,7 +116,7 @@ Limites conhecidos do DXF:
 - Nao voltar laranja como cor principal.
 - Nao fazer export 4K disparar multiplos downloads.
 - Nao voltar o nome antigo `nxgeo-mapa-4k.png`; o padrao atual e `NX-DD.MM.AAAA-NOMEDOPROJETO.png`.
-- Nao voltar o PNG 4K para `fitBounds` do projeto inteiro; o cliente quer exportar a janela visivel atual do mapa.
+- Nao voltar o PNG 4K para `fitBounds` do projeto inteiro; o cliente quer exportar o recorte que confirmou na moldura.
 - Ao mexer em exportacao, conferir filtros do mapa tambem no export.
 - Ao mexer em base cartografica, conferir que o PNG 4K usa a mesma base/toggle de ruas da tela.
 - Ao mexer em importacao, conferir hasControlGeometry, importedGeometries, surveyPoints, overlayOptions, corners, inputs e mode.

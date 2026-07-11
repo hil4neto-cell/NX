@@ -212,12 +212,33 @@ export async function createFolder(name: string, description = '') {
 }
 
 export async function archiveMap(mapId: string) {
-  const { error } = await supabase
-    .from('nxgeo_maps')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', mapId)
-
+  const { error } = await supabase.rpc('nxgeo_archive_map', { p_map_id: mapId })
   if (error) fail('Não foi possível mover o mapa para a lixeira', error)
+}
+
+export async function archiveFolder(folderId: string) {
+  const { data, error } = await supabase.rpc('nxgeo_admin_archive_folder', {
+    p_folder_id: folderId,
+  })
+  if (error) fail('Não foi possível arquivar a pasta', error)
+  return data as { archived_map_count?: number } | null
+}
+
+export async function moveMapToFolder(mapId: string, folderId: string) {
+  const { error: moveError } = await supabase.rpc('nxgeo_admin_move_map', {
+    p_map_id: mapId,
+    p_destination_folder_id: folderId,
+  })
+  if (moveError) fail('Não foi possível mover o mapa', moveError)
+
+  const { data, error } = await supabase
+    .from('nxgeo_maps')
+    .select('id,folder_id,name,project_path,thumbnail_path,export_path,revision,export_revision,created_by_member_id,updated_by_member_id,created_at,updated_at,deleted_at')
+    .eq('id', mapId)
+    .single()
+
+  if (error) fail('Não foi possível mover o mapa', error)
+  return normalizeMap(data as MapRow)
 }
 
 export async function saveMapProject<TProject>({
@@ -284,11 +305,9 @@ export async function saveMapProject<TProject>({
   const { data, error } = await supabase
     .from('nxgeo_maps')
     .update({
-      folder_id: folderId,
       name: title.trim(),
       state,
       project_path: projectPath,
-      deleted_at: null,
     })
     .eq('id', id)
     .eq('revision', baseRevision)

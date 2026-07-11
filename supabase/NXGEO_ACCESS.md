@@ -15,6 +15,7 @@ As migrations devem ser executadas nesta ordem:
 
 1. `migrations/20260711170000_nxgeo_email_allowlist.sql`;
 2. `migrations/20260711190000_nxgeo_workspace.sql`.
+3. `migrations/20260711213000_nxgeo_archive_actions.sql`.
 
 A segunda migration é compatível com a allowlist anterior: migra os e-mails existentes para `nxgeo_members`, substitui a verificação do Auth Hook e mantém a tabela antiga sincronizada durante a transição.
 
@@ -177,7 +178,9 @@ await supabase
 
 `description` é opcional e aceita até 500 caracteres.
 
-Usuários não criam nem renomeiam pastas, mas podem criar, abrir, salvar e arquivar mapas nas pastas atribuídas.
+Usuários não criam nem renomeiam pastas. Eles podem criar, abrir e salvar mapas nas pastas atribuídas; podem arquivar somente os mapas que criaram. Administradores criam, compartilham e arquivam pastas, podem mover mapas entre pastas e enxergam tudo.
+
+As pastas representam clientes ou projetos compartilhados do espaço de trabalho. Um usuário não recebe uma árvore privada automática: o administrador escolhe exatamente quais pastas compartilhar, evitando duplicidade e confusão para o cliente.
 
 ```ts
 const mapId = crypto.randomUUID()
@@ -198,13 +201,25 @@ O campo `state` guarda o estado serializável do editor, sem imagens em base64. 
 
 O frontend gera o UUID antes do insert para conhecer os paths futuros. A linha de `nxgeo_maps` precisa existir antes do primeiro upload, pois a política do Storage consulta esse registro para validar a pasta e o usuário.
 
-“Excluir” é soft delete:
+“Excluir” no produto é **arquivar**: sai da lista ativa, mas preserva arquivos e auditoria para uma futura restauração. Use as RPCs, nunca uma atualização direta do navegador:
 
 ```ts
-await supabase
-  .from('nxgeo_maps')
-  .update({ deleted_at: new Date().toISOString() })
-  .eq('id', mapId)
+await supabase.rpc('nxgeo_archive_map', { p_map_id: mapId })
+```
+
+Para arquivar uma pasta (somente admin), incluindo seus mapas ativos:
+
+```ts
+await supabase.rpc('nxgeo_admin_archive_folder', { p_folder_id: folderId })
+```
+
+Para reorganizar um mapa entre projetos (somente admin):
+
+```ts
+await supabase.rpc('nxgeo_admin_move_map', {
+  p_map_id: mapId,
+  p_destination_folder_id: folderId,
+})
 ```
 
 O trigger incrementa `revision` quando nome, pasta, estado, arquivo principal ou status de arquivamento mudam. Quando um novo `export_path` é registrado, o banco grava `export_revision = revision`.
@@ -255,6 +270,7 @@ A política de `storage.objects` localiza o mapa pelo primeiro segmento do path 
 
 - criação, atualização e arquivamento de pastas;
 - criação, salvamento, exportação e arquivamento de mapas;
+- movimentação de mapas entre pastas;
 - convites, mudança de papel/status e atribuição de pastas.
 
 Somente admins podem ler esse log. O conteúdo completo de `state` não é copiado para a auditoria.
