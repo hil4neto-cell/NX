@@ -38,6 +38,7 @@ type CornerKey = 'topLeft' | 'topRight' | 'bottomRight' | 'bottomLeft'
 type CoordinateMode = 'utm' | 'latlon'
 type SatelliteVariant = 'esri' | 'clarity'
 type BaseMap = 'satellite' | 'streets' | 'light' | 'dark'
+const baseMaps: BaseMap[] = ['satellite', 'streets', 'light', 'dark']
 
 type OverlayOptions = {
   showImported: boolean
@@ -225,8 +226,12 @@ function encodeSvg(svg: string) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
+function isBaseMap(value: unknown): value is BaseMap {
+  return typeof value === 'string' && baseMaps.includes(value as BaseMap)
+}
+
 function resolveBaseMap(project?: Pick<SavedProject, 'baseMap' | 'satellite' | 'satelliteVariant'>): BaseMap {
-  if (project?.baseMap) return project.baseMap
+  if (isBaseMap(project?.baseMap)) return project.baseMap
   // Projetos antigos que tinham Clarity passam a abrir no satélite estável.
   // O serviço Clarity é beta e não entrega dados de forma consistente no Brasil.
   return project?.satellite === false ? 'streets' : 'satellite'
@@ -1534,14 +1539,13 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
         },
         paint: { 'text-color': '#ffffff', 'text-halo-color': '#111827', 'text-halo-width': 1.5 },
       })
-      // Os nomes de rua precisam ficar sobre a planta, mas abaixo dos pontos e
-      // rótulos técnicos do projeto. Assim mantêm contraste sem competir com a
-      // leitura do levantamento.
-      if (map.getLayer('street-labels-major') && map.getLayer('survey-points')) {
-        map.moveLayer('street-labels-major', 'survey-points')
+      // Os nomes de rua ficam sobre a planta para ganhar contraste, mas abaixo
+      // das geometrias técnicas, pontos e rótulos do levantamento.
+      if (map.getLayer('street-labels-major') && map.getLayer('imported-fill')) {
+        map.moveLayer('street-labels-major', 'imported-fill')
       }
-      if (map.getLayer('street-labels-minor') && map.getLayer('survey-points')) {
-        map.moveLayer('street-labels-minor', 'survey-points')
+      if (map.getLayer('street-labels-minor') && map.getLayer('imported-fill')) {
+        map.moveLayer('street-labels-minor', 'imported-fill')
       }
       const latest = latestMapStateRef.current
       const floorPlanSource = map.getSource('floor-plan') as ImageSource | undefined
@@ -2027,11 +2031,11 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
         },
         paint: { 'text-color': '#ffffff', 'text-halo-color': '#111827', 'text-halo-width': 2 },
       })
-      if (exportMap.getLayer('street-labels-major') && exportMap.getLayer('survey-points')) {
-        exportMap.moveLayer('street-labels-major', 'survey-points')
+      if (exportMap.getLayer('street-labels-major') && exportMap.getLayer('imported-fill')) {
+        exportMap.moveLayer('street-labels-major', 'imported-fill')
       }
-      if (exportMap.getLayer('street-labels-minor') && exportMap.getLayer('survey-points')) {
-        exportMap.moveLayer('street-labels-minor', 'survey-points')
+      if (exportMap.getLayer('street-labels-minor') && exportMap.getLayer('imported-fill')) {
+        exportMap.moveLayer('street-labels-minor', 'imported-fill')
       }
 
       const exportCoordinates = [
