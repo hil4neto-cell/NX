@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NX | Projetos & Regularizações - Links</title>
     <meta name="description" content="Acesse nossos serviços para Pessoa Física, Empresas e canais de atendimento.">
     <!-- Open Graph / WhatsApp / Facebook -->
@@ -27,8 +27,9 @@
         body {
             background-color: #05070a;
             color: #fff;
-            height: 100dvh;
-            overflow: hidden;
+            min-height: 100dvh;
+            overflow-x: hidden;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -37,7 +38,7 @@
 
         body::before {
             content: '';
-            position: absolute;
+            position: fixed;
             top: -20px; left: -20px; right: -20px; bottom: -20px;
             background-image: url('public/bg-links.jpg');
             background-size: cover;
@@ -48,7 +49,7 @@
 
         body::after {
             content: '';
-            position: absolute;
+            position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
             background: linear-gradient(to bottom, rgba(5,7,10,0.6), rgba(5,7,10,0.95));
             z-index: -1;
@@ -57,7 +58,7 @@
         .container {
             width: 100%;
             max-width: 480px;
-            height: 100%;
+            min-height: 100dvh;
             padding: 2rem 1.5rem 1rem;
             display: flex;
             flex-direction: column;
@@ -254,6 +255,21 @@
             line-height: 1.4;
         }
 
+        a:focus-visible,
+        button:focus-visible {
+            outline: 3px solid #fff;
+            outline-offset: 3px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                scroll-behavior: auto !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -285,14 +301,14 @@
             <hr class="section-divider">
 
             <div class="social-grid">
-                <a href="https://wa.me/5598991424677" target="_blank" class="social-item whatsapp">
+                <a href="https://wa.me/5598991424677?text=Ol%C3%A1%2C%20vim%20pela%20p%C3%A1gina%20de%20links%20da%20NX%20Projetos%20e%20gostaria%20de%20atendimento." target="_blank" rel="noopener noreferrer" class="social-item whatsapp">
                     <div class="icon-wrapper">
                         <img src="public/icon-whatsapp.svg" alt="WhatsApp">
                     </div>
                     <span class="social-text">Entre em contato</span>
                 </a>
 
-                <a href="https://instagram.com/nx.projetos" target="_blank" class="social-item instagram">
+                <a href="https://instagram.com/nx.projetos" target="_blank" rel="noopener noreferrer" class="social-item instagram">
                     <div class="icon-wrapper">
                         <img src="public/icon-instagram.svg" alt="Instagram">
                     </div>
@@ -300,7 +316,7 @@
                 </a>
             </div>
 
-            <button class="share-btn" id="shareBtn">
+            <button type="button" class="share-btn" id="shareBtn">
                 <div class="icon-wrapper">
                     <img src="public/icon-share.svg" alt="Compartilhar">
                 </div>
@@ -328,8 +344,12 @@
                 }
             } else {
                 // Fallback para caso o dispositivo não suporte (copia para a área de transferência)
-                navigator.clipboard.writeText('https://nxprojetos.com');
-                alert('Link copiado para a área de transferência!');
+                try {
+                    await navigator.clipboard.writeText('https://nxprojetos.com');
+                    alert('Link copiado para a área de transferência!');
+                } catch (err) {
+                    window.prompt('Copie o link abaixo:', 'https://nxprojetos.com');
+                }
             }
         });
     </script>
