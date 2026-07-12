@@ -461,6 +461,9 @@ function setLayerVisibility(map: maplibregl.Map, layerId: string, visible: boole
 }
 
 function applyOverlayOptions(map: maplibregl.Map, options: OverlayOptions) {
+  // A planta posicionada faz parte do controle de ajuste. Ao ocultar o
+  // controle, desaparecem juntos a área, o contorno e os quatro cantos.
+  setLayerVisibility(map, 'floor-plan-layer', options.showControl)
   setLayerVisibility(map, 'imported-fill', options.showImported)
   setLayerVisibility(map, 'imported-line', options.showImported)
   setLayerVisibility(map, 'footprint-fill', options.showControl)
@@ -1461,6 +1464,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
         id: 'floor-plan-layer',
         type: 'raster',
         source: 'floor-plan',
+        layout: { visibility: layerVisibility(defaultOverlayOptions.showControl) },
         paint: { 'raster-opacity': initial.opacity, 'raster-fade-duration': 0 },
       })
       map.addSource('footprint', { type: 'geojson', data: footprintGeoJson(initial.corners, [], [], false) })
@@ -1743,6 +1747,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
       const nextCorners = parsed as FourCoordinates
       rememberState()
       setHasControlGeometry(true)
+      setOverlayOptions((current) => ({ ...current, showControl: true }))
       setCorners(nextCorners)
       setStatus('Coordenadas aplicadas. Refine o encaixe pelos pontos de controle no mapa.')
       scheduleFitToData(nextCorners)
@@ -1758,6 +1763,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
       rememberState()
       setImageUrl(String(reader.result))
       setImageName(file.name)
+      setOverlayOptions((current) => ({ ...current, showControl: true }))
       setStatus(hasControlGeometry ? 'Planta carregada sobre a geometria atual. Ajuste a opacidade ou os pontos se precisar.' : 'Planta carregada. Ela aparece como rascunho; importe PDNEZ/KML/DXF ou aplique coordenadas para posicionar com precisao.')
       window.requestAnimationFrame(() => {
         if (mapRef.current) fitMapToCoordinates(mapRef.current, corners, baseMapMaxZoom(baseMap))
@@ -1955,6 +1961,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
         id: 'floor-plan-layer',
         type: 'raster',
         source: 'floor-plan',
+        layout: { visibility: layerVisibility(overlayOptions.showControl) },
         paint: { 'raster-opacity': opacity, 'raster-fade-duration': 0 },
       })
       exportMap.addSource('footprint', { type: 'geojson', data: footprintGeoJson(corners, surveyPoints, importedGeometries, hasControlGeometry) })
