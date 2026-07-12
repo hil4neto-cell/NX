@@ -37,6 +37,8 @@ type FourCoordinates = [Coordinate, Coordinate, Coordinate, Coordinate]
 type CornerKey = 'topLeft' | 'topRight' | 'bottomRight' | 'bottomLeft'
 type CoordinateMode = 'utm' | 'latlon'
 type SatelliteVariant = 'esri' | 'clarity'
+type BaseMap = 'satellite' | 'streets' | 'light' | 'dark'
+const baseMaps: BaseMap[] = ['satellite', 'streets', 'light', 'dark']
 
 type OverlayOptions = {
   showImported: boolean
@@ -94,6 +96,8 @@ export type SavedProject = {
   surveyPoints?: SurveyPoint[]
   importedGeometries?: ImportedGeometry[]
   overlayOptions?: OverlayOptions
+  /** Base atual. Os campos abaixo continuam para abrir JSONs antigos sem perda. */
+  baseMap?: BaseMap
   satellite?: boolean
   satelliteVariant?: SatelliteVariant
   streetNames?: boolean
@@ -120,8 +124,7 @@ type AppSnapshot = {
   zone: number
   hemisphere: 'N' | 'S'
   opacity: number
-  satellite: boolean
-  satelliteVariant: SatelliteVariant
+  baseMap: BaseMap
   streetNames: boolean
   metadata: ProjectMetadata
   surveyPoints: SurveyPoint[]
@@ -223,69 +226,133 @@ function encodeSvg(svg: string) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
-function satelliteMaxZoom(satelliteVisible: boolean, variant: SatelliteVariant) {
-  if (!satelliteVisible) return 20
-  // A fonte Clarity deixa de entregar tiles confiáveis acima desse nível em
-  // partes do Brasil. Mantemos o teto real da fonte para não gerar áreas
-  // transparentes no editor ou na imagem final; a base Esri comum continua
-  // podendo usar mais detalhe quando disponível.
-  return variant === 'clarity' ? 17 : 20
+function isBaseMap(value: unknown): value is BaseMap {
+  return typeof value === 'string' && baseMaps.includes(value as BaseMap)
+}
+
+function resolveBaseMap(project?: Pick<SavedProject, 'baseMap' | 'satellite' | 'satelliteVariant'>): BaseMap {
+  if (isBaseMap(project?.baseMap)) return project.baseMap
+  // Projetos antigos que tinham Clarity passam a abrir no satélite estável.
+  // O serviço Clarity é beta e não entrega dados de forma consistente no Brasil.
+  return project?.satellite === false ? 'streets' : 'satellite'
+}
+
+function baseMapMaxZoom(_baseMap: BaseMap) {
+  return 20
+}
+
+function baseMapAttribution(baseMap: BaseMap) {
+  if (baseMap === 'satellite') {
+    return 'Base: Esri, Maxar, Earthstar Geographics e GIS User Community'
+  }
+  return 'Base: © OpenStreetMap contributors, © CARTO'
 }
 
 function makeStyle(
-  satelliteVisible: boolean,
-  satelliteVariant: SatelliteVariant = 'esri',
+  baseMap: BaseMap,
   streetNamesVisible = true,
+  target: 'editor' | 'export' = 'editor',
 ): StyleSpecification {
-  const useEsri = satelliteVisible && satelliteVariant === 'esri'
-  const useClarity = satelliteVisible && satelliteVariant === 'clarity'
+  const showStreetLabels = baseMap === 'satellite' && streetNamesVisible
+  const isExport = target === 'export'
+  const labelPaint = {
+    'text-color': '#ffffff',
+    'text-halo-color': isExport ? '#020617' : '#07111f',
+    'text-halo-width': isExport ? 2.25 : 1.15,
+    'text-halo-blur': isExport ? 0.2 : 0.1,
+  } as const
 
   return {
     version: 8,
+    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sources: {
-      osm: {
-        type: 'raster',
-        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-        tileSize: 256,
-        maxzoom: 19,
-        attribution: 'OpenStreetMap contributors',
-      },
       esri: {
         type: 'raster',
         tiles: [
           'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         ],
         tileSize: 256,
-        maxzoom: 20,
+        // Nesta área a Esri entrega imagem real até z19; em z20 o servidor
+        // responde com o mosaico cinza "Map data not yet available". O
+        // MapLibre amplia o último tile válido no zoom seguinte, preservando
+        // o recorte 4K sem trocar a imagem por esse placeholder.
+        maxzoom: 19,
         attribution: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
       },
-      esriClarity: {
+      cartoStreets: {
         type: 'raster',
-        tiles: [
-          'https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        ],
+        tiles: ['https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{ratio}.png'],
         tileSize: 256,
-        maxzoom: 17,
-        attribution: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
-      },
-      streetLabels: {
-        type: 'raster',
-        tiles: ['https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}@2x.png'],
-        tileSize: 512,
         maxzoom: 20,
-        attribution: 'OpenStreetMap contributors, CARTO',
+        attribution: '© OpenStreetMap contributors, © CARTO',
+      },
+      cartoLight: {
+        type: 'raster',
+        tiles: ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{ratio}.png'],
+        tileSize: 256,
+        maxzoom: 20,
+        attribution: '© OpenStreetMap contributors, © CARTO',
+      },
+      cartoDark: {
+        type: 'raster',
+        tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{ratio}.png'],
+        tileSize: 256,
+        maxzoom: 20,
+        attribution: '© OpenStreetMap contributors, © CARTO',
+      },
+      openFreeMap: {
+        type: 'vector',
+        url: 'https://tiles.openfreemap.org/planet',
+        attribution: '© OpenStreetMap contributors, © OpenMapTiles, © OpenFreeMap',
       },
     },
     layers: [
-      { id: 'osm', type: 'raster', source: 'osm', layout: { visibility: satelliteVisible ? 'none' : 'visible' } },
-      { id: 'esri', type: 'raster', source: 'esri', layout: { visibility: useEsri ? 'visible' : 'none' } },
-      { id: 'esri-clarity', type: 'raster', source: 'esriClarity', layout: { visibility: useClarity ? 'visible' : 'none' } },
+      { id: 'esri', type: 'raster', source: 'esri', layout: { visibility: baseMap === 'satellite' ? 'visible' : 'none' } },
+      { id: 'carto-streets', type: 'raster', source: 'cartoStreets', layout: { visibility: baseMap === 'streets' ? 'visible' : 'none' } },
+      { id: 'carto-light', type: 'raster', source: 'cartoLight', layout: { visibility: baseMap === 'light' ? 'visible' : 'none' } },
+      { id: 'carto-dark', type: 'raster', source: 'cartoDark', layout: { visibility: baseMap === 'dark' ? 'visible' : 'none' } },
       {
-        id: 'street-labels',
-        type: 'raster',
-        source: 'streetLabels',
-        layout: { visibility: satelliteVisible && streetNamesVisible ? 'visible' : 'none' },
-        paint: { 'raster-opacity': 0.96 },
+        id: 'street-labels-major',
+        type: 'symbol',
+        source: 'openFreeMap',
+        'source-layer': 'transportation_name',
+        minzoom: 12,
+        filter: ['all', ['has', 'name'], ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary', 'tertiary']]]],
+        layout: {
+          visibility: showStreetLabels ? 'visible' : 'none',
+          'symbol-placement': 'line',
+          'text-field': ['coalesce', ['get', 'name'], ['get', 'name_en'], ''],
+          'text-font': ['Noto Sans Regular'],
+          // O PNG tem 3840 px de largura e normalmente é visto reduzido. A
+          // escala 2x preserva a leitura que a pessoa tem no editor sem deixar
+          // os rótulos gigantes enquanto trabalha no mapa.
+          'text-size': isExport
+            ? ['interpolate', ['linear'], ['zoom'], 12, 20, 17, 22]
+            : ['interpolate', ['linear'], ['zoom'], 12, 10, 17, 11],
+          'text-max-angle': 30,
+          'text-padding': isExport ? 5 : 3,
+        },
+        paint: labelPaint,
+      },
+      {
+        id: 'street-labels-minor',
+        type: 'symbol',
+        source: 'openFreeMap',
+        'source-layer': 'transportation_name',
+        minzoom: 15,
+        filter: ['all', ['has', 'name'], ['in', ['get', 'class'], ['literal', ['minor', 'service', 'track', 'living_street', 'residential', 'unclassified']]]],
+        layout: {
+          visibility: showStreetLabels ? 'visible' : 'none',
+          'symbol-placement': 'line',
+          'text-field': ['coalesce', ['get', 'name'], ['get', 'name_en'], ''],
+          'text-font': ['Noto Sans Regular'],
+          'text-size': isExport
+            ? ['interpolate', ['linear'], ['zoom'], 15, 18, 18, 21]
+            : ['interpolate', ['linear'], ['zoom'], 15, 10, 18, 11],
+          'text-max-angle': 30,
+          'text-padding': isExport ? 5 : 3,
+        },
+        paint: labelPaint,
       },
     ],
   }
@@ -1200,8 +1267,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
     imageUrl: initialProject?.imageUrl ?? emptyPlanImage,
     corners: startingCorners,
     opacity: initialProject?.opacity ?? (initialProject ? 0.62 : 0),
-    satellite: initialProject?.satellite ?? true,
-    satelliteVariant: initialProject?.satelliteVariant ?? 'esri',
+    baseMap: resolveBaseMap(initialProject),
     streetNames: initialProject?.streetNames ?? true,
     viewport: initialProject?.viewport,
   })
@@ -1214,8 +1280,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
   const [zone, setZone] = useState(initialProject?.zone ?? 23)
   const [hemisphere, setHemisphere] = useState<'N' | 'S'>(initialProject?.hemisphere ?? 'S')
   const [opacity, setOpacity] = useState(initialProject?.opacity ?? 0.62)
-  const [satellite, setSatellite] = useState(initialProject?.satellite ?? true)
-  const [satelliteVariant, setSatelliteVariant] = useState<SatelliteVariant>(initialProject?.satelliteVariant ?? 'esri')
+  const [baseMap, setBaseMap] = useState<BaseMap>(() => resolveBaseMap(initialProject))
   const [streetNames, setStreetNames] = useState(initialProject?.streetNames ?? true)
   const [metadata, setMetadata] = useState<ProjectMetadata>(startingMetadata)
   const [surveyPoints, setSurveyPoints] = useState<SurveyPoint[]>(initialProject?.surveyPoints ?? [])
@@ -1242,8 +1307,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
     opacity,
     surveyPoints,
     importedGeometries,
-    satellite,
-    satelliteVariant,
+    baseMap,
     streetNames,
     overlayOptions,
   })
@@ -1255,8 +1319,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
     opacity,
     surveyPoints,
     importedGeometries,
-    satellite,
-    satelliteVariant,
+    baseMap,
     streetNames,
     overlayOptions,
   }
@@ -1278,10 +1341,13 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
     surveyPoints,
     importedGeometries,
     overlayOptions,
-    satellite,
-    satelliteVariant,
+    baseMap,
+    // Mantidos para que os arquivos exportados continuem abrindo em versões
+    // anteriores do NXGEO. A fonte Clarity nunca é mais gravada.
+    satellite: baseMap === 'satellite',
+    satelliteVariant: 'esri',
     streetNames,
-  }), [corners, hasControlGeometry, hemisphere, imageName, imageUrl, importedGeometries, inputs, metadata, mode, opacity, overlayOptions, satellite, satelliteVariant, streetNames, surveyPoints, zone])
+  }), [baseMap, corners, hasControlGeometry, hemisphere, imageName, imageUrl, importedGeometries, inputs, metadata, mode, opacity, overlayOptions, streetNames, surveyPoints, zone])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -1318,15 +1384,14 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
       zone,
       hemisphere,
       opacity,
-      satellite,
-      satelliteVariant,
+      baseMap,
       streetNames,
       metadata: { ...metadata },
       surveyPoints: surveyPoints.map((point) => ({ ...point, coordinate: [...point.coordinate] as Coordinate })),
       importedGeometries: importedGeometries.map((feature) => JSON.parse(JSON.stringify(feature)) as ImportedGeometry),
       overlayOptions: { ...overlayOptions },
     }
-  }, [corners, hasControlGeometry, hemisphere, imageName, imageUrl, importedGeometries, inputs, metadata, mode, opacity, overlayOptions, satellite, satelliteVariant, streetNames, surveyPoints, zone])
+  }, [baseMap, corners, hasControlGeometry, hemisphere, imageName, imageUrl, importedGeometries, inputs, metadata, mode, opacity, overlayOptions, streetNames, surveyPoints, zone])
 
   const rememberState = useCallback(() => {
     undoStackRef.current = [...undoStackRef.current.slice(-24), makeSnapshot()]
@@ -1343,8 +1408,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
     setZone(snapshot.zone)
     setHemisphere(snapshot.hemisphere)
     setOpacity(snapshot.opacity)
-    setSatellite(snapshot.satellite)
-    setSatelliteVariant(snapshot.satelliteVariant ?? 'esri')
+    setBaseMap(snapshot.baseMap)
     setStreetNames(snapshot.streetNames ?? true)
     setMetadata(snapshot.metadata)
     setSurveyPoints(snapshot.surveyPoints ?? [])
@@ -1375,7 +1439,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
     let viewportTrackingTimer = 0
     const map = new maplibregl.Map({
       container: mapNodeRef.current,
-      style: makeStyle(initial.satellite, initial.satelliteVariant, initial.streetNames),
+      style: makeStyle(initial.baseMap, initial.streetNames),
       center: initial.corners[0] as LngLatLike,
       zoom: 15.5,
       attributionControl: false,
@@ -1486,6 +1550,14 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
         },
         paint: { 'text-color': '#ffffff', 'text-halo-color': '#111827', 'text-halo-width': 1.5 },
       })
+      // Os nomes de rua ficam sobre a planta para ganhar contraste, mas abaixo
+      // das geometrias técnicas, pontos e rótulos do levantamento.
+      if (map.getLayer('street-labels-major') && map.getLayer('imported-fill')) {
+        map.moveLayer('street-labels-major', 'imported-fill')
+      }
+      if (map.getLayer('street-labels-minor') && map.getLayer('imported-fill')) {
+        map.moveLayer('street-labels-minor', 'imported-fill')
+      }
       const latest = latestMapStateRef.current
       const floorPlanSource = map.getSource('floor-plan') as ImageSource | undefined
       floorPlanSource?.updateImage({ url: latest.imageUrl, coordinates: latest.corners })
@@ -1513,7 +1585,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
               ...(latest.hasControlGeometry ? latest.corners : []),
               ...collectImportedCoordinates(latest.importedGeometries),
             ],
-            satelliteMaxZoom(latest.satellite, latest.satelliteVariant),
+            baseMapMaxZoom(latest.baseMap),
           )
         }
         viewportTrackingTimer = window.setTimeout(() => {
@@ -1560,13 +1632,16 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
   useEffect(() => {
     const map = mapRef.current
     if (!mapReady || !map) return
-    if (map.getLayer('osm')) map.setLayoutProperty('osm', 'visibility', satellite ? 'none' : 'visible')
-    if (map.getLayer('esri')) map.setLayoutProperty('esri', 'visibility', satellite && satelliteVariant === 'esri' ? 'visible' : 'none')
-    if (map.getLayer('esri-clarity')) map.setLayoutProperty('esri-clarity', 'visibility', satellite && satelliteVariant === 'clarity' ? 'visible' : 'none')
-    if (map.getLayer('street-labels')) map.setLayoutProperty('street-labels', 'visibility', satellite && streetNames ? 'visible' : 'none')
-    const maxZoom = satelliteMaxZoom(satellite, satelliteVariant)
-    if (satellite && map.getZoom() > maxZoom) map.zoomTo(maxZoom, { duration: 250 })
-  }, [mapReady, satellite, satelliteVariant, streetNames])
+    if (map.getLayer('esri')) map.setLayoutProperty('esri', 'visibility', baseMap === 'satellite' ? 'visible' : 'none')
+    if (map.getLayer('carto-streets')) map.setLayoutProperty('carto-streets', 'visibility', baseMap === 'streets' ? 'visible' : 'none')
+    if (map.getLayer('carto-light')) map.setLayoutProperty('carto-light', 'visibility', baseMap === 'light' ? 'visible' : 'none')
+    if (map.getLayer('carto-dark')) map.setLayoutProperty('carto-dark', 'visibility', baseMap === 'dark' ? 'visible' : 'none')
+    const labelVisibility = baseMap === 'satellite' && streetNames ? 'visible' : 'none'
+    if (map.getLayer('street-labels-major')) map.setLayoutProperty('street-labels-major', 'visibility', labelVisibility)
+    if (map.getLayer('street-labels-minor')) map.setLayoutProperty('street-labels-minor', 'visibility', labelVisibility)
+    const maxZoom = baseMapMaxZoom(baseMap)
+    if (map.getZoom() > maxZoom) map.zoomTo(maxZoom, { duration: 250 })
+  }, [baseMap, mapReady, streetNames])
 
   useEffect(() => {
     const map = mapRef.current
@@ -1632,7 +1707,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
       ...(nextHasControlGeometry ? nextCorners : []),
       ...collectImportedCoordinates(nextImportedGeometries),
     ]
-    fitMapToCoordinates(map, coordinates, satelliteMaxZoom(satellite, satelliteVariant))
+    fitMapToCoordinates(map, coordinates, baseMapMaxZoom(baseMap))
   }
 
   function scheduleFitToData(
@@ -1685,7 +1760,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
       setImageName(file.name)
       setStatus(hasControlGeometry ? 'Planta carregada sobre a geometria atual. Ajuste a opacidade ou os pontos se precisar.' : 'Planta carregada. Ela aparece como rascunho; importe PDNEZ/KML/DXF ou aplique coordenadas para posicionar com precisao.')
       window.requestAnimationFrame(() => {
-        if (mapRef.current) fitMapToCoordinates(mapRef.current, corners, satelliteMaxZoom(satellite, satelliteVariant))
+        if (mapRef.current) fitMapToCoordinates(mapRef.current, corners, baseMapMaxZoom(baseMap))
       })
     }
     reader.readAsDataURL(file)
@@ -1854,7 +1929,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
     try {
       exportMap = new maplibregl.Map({
         container,
-        style: makeStyle(satellite, satelliteVariant, streetNames),
+        style: makeStyle(baseMap, streetNames, 'export'),
         center: corners[0] as LngLatLike,
         zoom: 16,
         attributionControl: false,
@@ -1967,6 +2042,12 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
         },
         paint: { 'text-color': '#ffffff', 'text-halo-color': '#111827', 'text-halo-width': 2 },
       })
+      if (exportMap.getLayer('street-labels-major') && exportMap.getLayer('imported-fill')) {
+        exportMap.moveLayer('street-labels-major', 'imported-fill')
+      }
+      if (exportMap.getLayer('street-labels-minor') && exportMap.getLayer('imported-fill')) {
+        exportMap.moveLayer('street-labels-minor', 'imported-fill')
+      }
 
       const exportCoordinates = [
         ...(hasControlGeometry ? corners : []),
@@ -1980,11 +2061,9 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
       await waitForMapIdle(exportMap)
 
       const mapCanvas = exportMap.getCanvas()
-      const baseAttribution = satellite
-        ? 'Base: Esri, Maxar, Earthstar Geographics e GIS User Community'
-        : 'Base: © OpenStreetMap contributors'
-      const labelAttribution = satellite && streetNames
-        ? ' | Rotulos: © OpenStreetMap contributors, © CARTO'
+      const baseAttribution = baseMapAttribution(baseMap)
+      const labelAttribution = baseMap === 'satellite' && streetNames
+        ? ' | Rótulos: © OpenStreetMap contributors, © OpenMapTiles, © OpenFreeMap'
         : ''
       const exportCanvas = await composeExportCanvasWithFooter(
         mapCanvas,
@@ -2128,8 +2207,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
         setZone(data.zone ?? 23)
         setHemisphere(data.hemisphere ?? 'S')
         setMetadata({ ...defaultMetadata, ...(data.metadata ?? {}) })
-        setSatellite(data.satellite ?? true)
-        setSatelliteVariant(data.satelliteVariant ?? 'esri')
+        setBaseMap(resolveBaseMap(data))
         setStreetNames(data.streetNames ?? true)
         setHasControlGeometry(data.hasControlGeometry ?? true)
         setSurveyPoints(data.surveyPoints ?? [])
@@ -2158,8 +2236,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
     setCorners(defaultCorners)
     setInputs(emptyInputs)
     setOpacity(0.62)
-    setSatellite(true)
-    setSatelliteVariant('esri')
+    setBaseMap('satellite')
     setStreetNames(true)
     setMetadata(defaultMetadata)
     setSurveyPoints([])
@@ -2180,8 +2257,7 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
     setCorners(defaultCorners)
     setInputs(demoUtm)
     setOpacity(0.62)
-    setSatellite(true)
-    setSatelliteVariant('esri')
+    setBaseMap('satellite')
     setStreetNames(true)
     setMetadata(defaultMetadata)
     setSurveyPoints([])
@@ -2323,31 +2399,21 @@ function App({ initialProject, workspaceTitle, onBack, onSaveProject, onSaveExpo
             <Satellite size={17} />
             <span>Base cartografica</span>
           </div>
-          <div className="segmented base-selector" role="group" aria-label="Base do mapa">
-            <button className={!satellite ? 'active' : ''} onClick={() => setSatellite(false)}>Mapa</button>
-            <button
-              className={satellite && satelliteVariant === 'esri' ? 'active' : ''}
-              onClick={() => {
-                setSatellite(true)
-                setSatelliteVariant('esri')
-              }}
-            >
-              Satelite
-            </button>
-            <button
-              className={satellite && satelliteVariant === 'clarity' ? 'active' : ''}
-              onClick={() => {
-                setSatellite(true)
-                setSatelliteVariant('clarity')
-              }}
-            >
-              Clarity
-            </button>
-          </div>
-          <label className="switch-row">
-            <span>Nomes de ruas</span>
-            <input type="checkbox" checked={streetNames} onChange={(event) => setStreetNames(event.target.checked)} />
+          <label className="map-style-field">
+            <span>Estilo do mapa</span>
+            <select value={baseMap} onChange={(event) => setBaseMap(event.target.value as BaseMap)}>
+              <option value="satellite">Satélite · terreno real</option>
+              <option value="streets">Ruas e limites</option>
+              <option value="light">Técnico claro</option>
+              <option value="dark">Campo escuro</option>
+            </select>
           </label>
+          {baseMap === 'satellite' && (
+            <label className="switch-row">
+              <span>Rótulos de ruas</span>
+              <input type="checkbox" checked={streetNames} onChange={(event) => setStreetNames(event.target.checked)} />
+            </label>
+          )}
           <label className="range-row">
             <span>Opacidade</span>
             <strong>{Math.round(opacity * 100)}%</strong>

@@ -626,6 +626,14 @@
   display: block;
 }
 
+.map-preview-hint {
+  display: block;
+  margin-top: 5px;
+  color: #8291a8;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .map-card-body strong {
   overflow: hidden;
   font-size: 14px;
