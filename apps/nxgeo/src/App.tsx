@@ -272,7 +272,11 @@ function makeStyle(
           'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         ],
         tileSize: 256,
-        maxzoom: 20,
+        // Nesta área a Esri entrega imagem real até z19; em z20 o servidor
+        // responde com o mosaico cinza "Map data not yet available". O
+        // MapLibre amplia o último tile válido no zoom seguinte, preservando
+        // o recorte 4K sem trocar a imagem por esse placeholder.
+        maxzoom: 19,
         attribution: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
       },
       cartoStreets: {
